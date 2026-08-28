@@ -2,6 +2,9 @@
 
 An AI prototype that evaluates whether LLM-based methods can surface radicalisation-vulnerability indicators from synthetic Singaporean personas.
 
+Video: https://streamable.com/p0bpy4
+Narrative: 
+
 ## Contents
 
 - [How it works](#how-it-works)
