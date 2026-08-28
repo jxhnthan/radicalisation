@@ -4,7 +4,7 @@ An AI prototype that evaluates whether LLM-based methods can surface radicalisat
 
 Video: https://streamable.com/p0bpy4
 
-Narrative: 
+Narrative: https://pastebin.com/2ArUmEcc
 
 ## Contents
 
