@@ -166,11 +166,20 @@ def reveal(req: RevealRequest) -> dict:
     row = match.iloc[0]
 
     analysis = judge_persona(row)
-    injected = str(row["injected_factors"]).split(",") if int(row["label"]) == 1 else []
+    # injected_factors can be an empty/NaN cell for a few partial-indicator
+    # personas (the LLM rewrite returned no factors that normalise_factors
+    # kept). Filter non-string values so the UI never shows "nan".
+    injected: list[str] = []
+    if int(row["label"]) == 1 and isinstance(row["injected_factors"], str):
+        injected = [
+            f.strip()
+            for f in row["injected_factors"].split(",")
+            if f.strip() and f.strip().lower() not in {"nan", "none", "nat"}
+        ]
     ground_truth = {
         "label": int(row["label"]),
         "class_label": str(row.get("class_label", "unknown")),
-        "injected_factors": [f for f in injected if f],
+        "injected_factors": injected,
     }
     return {
         "persona": persona_public(row),
