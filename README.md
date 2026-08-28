@@ -333,7 +333,20 @@ Metrics are at the flag threshold (signal >= 3).
 
 ## 11. Use of AI coding agents
 
-WIP
+AI coding agents were used for two specific, bounded tasks: static-analysis remediation and API component construction. Methodology, evaluation design, and dataset construction (Sections 2, 4, 5) were reasoned manually and are not part of this disclosure.
+
+**1. SonarQube issue triage and remediation.**
+The codebase was scanned with SonarQube, and an AI agent was used to work through the flagged issues across the Python (`src/`, `backend/`) and JavaScript/React (`frontend/src/`) files. The agent's role was to:
+- Explain each flagged issue (code smell, potential bug, security hotspot, duplication) in context.
+- Propose a fix consistent with the surrounding code style.
+- Apply the fix, which was then re-scanned to confirm the issue cleared without introducing a new one.
+
+Every proposed fix was reviewed before acceptance rather than applied blind, particularly for flags touching `src/scoring.py` and `src/evaluate.py`, where a careless "fix" could silently change scoring or metric logic. Fixes that were purely stylistic (unused imports, naming conventions, duplicate string literals) were accepted with lighter review than fixes touching control flow or data handling.
+
+**2. API component construction.**
+An AI agent assisted in building out the FastAPI backend (`backend/app.py`) endpoints and the corresponding frontend API client (`frontend/src/api.js`) — request/response schemas, route handlers for persona serving and session submission, and the `/api/health` and `/api/performance` endpoints. 
+
+This was verified rather than trusted outright: each endpoint was smoke-tested manually (`curl` checks returning 200, confirmed in Section 6/7), and the session-submission and no-repeat-serving logic was covered by the backend test suite (`tests/test_backend.py`) to confirm behaviour matched intent, not just that the endpoint returned without error.
 
 ## 12. Layout
 
