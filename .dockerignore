@@ -1,0 +1,13 @@
+.venv
+notebooks
+frontend/node_modules
+__pycache__
+*.pyc
+.env
+.git
+# Only the files the backend image needs; keep the build context small
+data/*
+!data/labelled_personas.csv
+!data/app_pool.csv
+!data/analyses.json
+!data/evaluation_results.json

@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.DS_Store
+.env
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+
+# Runtime/generated data (not needed for the app to run from a clone)
+data/admin/
+data/injection_log.jsonl
+
+# Precomputed data the app needs to run offline - committed so a clone works
+data/*
+!data/labelled_personas.csv
+!data/app_pool.csv
+!data/analyses.json
+!data/evaluation_results.json
+!data/personas_sample_1000.csv

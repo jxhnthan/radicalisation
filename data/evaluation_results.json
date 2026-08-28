@@ -1,0 +1,64 @@
+{
+  "rule_based": {
+    "n": 1000,
+    "positives": 200,
+    "precision": 1.0,
+    "recall": 0.06,
+    "f1": 0.113,
+    "roc_auc": 0.819,
+    "per_class": {
+      "baseline": {
+        "n": 700,
+        "flagged": 0
+      },
+      "full_indicator": {
+        "n": 150,
+        "flagged": 12
+      },
+      "partial_indicator": {
+        "n": 50,
+        "flagged": 0
+      },
+      "hard_negative": {
+        "n": 100,
+        "flagged": 0
+      }
+    }
+  },
+  "note": "Precision/recall are at the flag threshold (signal >= 3).",
+  "hard_negative_fp_rate": {
+    "rule_based": 0.0,
+    "llm_judge": 0.0
+  },
+  "llm_judge": {
+    "n": 400,
+    "positives": 200,
+    "precision": 1.0,
+    "recall": 0.31,
+    "f1": 0.473,
+    "roc_auc": 0.793,
+    "per_class": {
+      "baseline": {
+        "n": 700,
+        "flagged": 0
+      },
+      "full_indicator": {
+        "n": 150,
+        "flagged": 62
+      },
+      "partial_indicator": {
+        "n": 50,
+        "flagged": 0
+      },
+      "hard_negative": {
+        "n": 100,
+        "flagged": 0
+      }
+    }
+  },
+  "agreement": {
+    "n": 400,
+    "signal_pearson": 0.852,
+    "flag_cohens_kappa": 0.232
+  }
+}

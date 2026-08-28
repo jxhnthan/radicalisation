@@ -1,0 +1,17 @@
+# HTTP - Hugging Face datasets-server API (no `datasets` library needed)
+requests>=2.31
+
+# Data
+pandas>=2.2
+pyarrow>=16.0
+
+# ML / NLP
+scikit-learn>=1.4
+nltk>=3.8
+
+# Viz (minimalist style)
+matplotlib>=3.8
+
+# Notebooks
+jupyter>=1.0
+ipykernel>=6.29
