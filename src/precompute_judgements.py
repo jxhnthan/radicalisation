@@ -1,15 +1,5 @@
-"""Precompute LLM-judge analyses for the app persona pool.
-
-Runs the indicator judge over a balanced subset of the labelled set and writes:
-  data/analyses.json   - {uuid: analysis}
-  data/app_pool.csv    - the subset of personas the app will serve
-
-This makes the app's "reveal" instant and offline (no live Ollama call per
-click), and makes the demo robust to the local model being unavailable.
-
-Usage:
-  .venv/bin/python -m src.precompute_judgements --pos 100 --neg 100
-"""
+# Precomputes LLM-judge analyses for the app persona pool so the "reveal" step
+# is instant and offline. Writes data/analyses.json + data/app_pool.csv.
 from __future__ import annotations
 
 import argparse
@@ -39,7 +29,6 @@ TEXT_FIELDS = [
 
 
 def judge_persona(row) -> dict:
-    """Run the indicator judge on one persona row, returning the parsed JSON."""
     persona_text = "\n".join(f"{f}: {row[f]}" for f in TEXT_FIELDS)
     system = JUDGE_PROMPT.read_text(encoding="utf-8")
     user = f"Persona:\n{persona_text}\n\nAnalyse this persona and return JSON."

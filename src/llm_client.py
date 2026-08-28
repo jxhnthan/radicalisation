@@ -1,13 +1,6 @@
-"""Minimal OpenAI-compatible chat-completions client (requests-based).
-
-Works with any OpenAI-compatible endpoint: OpenAI, NVIDIA NIM
-(build.nvidia.com), Ollama (http://localhost:11434/v1), Groq, Together, etc.
-
-Config (env vars, or a .env file at the project root - env vars win):
-    LLM_BASE_URL   default https://api.openai.com/v1
-    LLM_API_KEY
-    LLM_MODEL      default gpt-4o-mini
-"""
+# Minimal OpenAI-compatible chat-completions client. Works with any endpoint
+# (OpenAI, NVIDIA NIM, Ollama, Groq, ...). Config via env vars or a .env file
+# at the project root - env vars win.
 from __future__ import annotations
 
 import json
@@ -20,7 +13,6 @@ DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 
 def _load_dotenv() -> None:
-    """Parse a simple KEY=VALUE .env at the project root if present."""
     path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
     if not os.path.exists(path):
         return
@@ -52,11 +44,8 @@ def chat_completion(
     max_tokens: int = 600,
     retries: int = 3,
 ) -> str:
-    """Return the assistant message content for a chat-completions call.
-
-    Tries JSON mode first; falls back to plain mode if the endpoint rejects
-    `response_format` (e.g. some local servers).
-    """
+    # JSON mode first; fall back to plain mode if the endpoint rejects
+    # `response_format` (e.g. some local servers).
     cfg = config()
     if not cfg["api_key"]:
         raise RuntimeError("LLM_API_KEY not set (and no .env). See .env.example.")

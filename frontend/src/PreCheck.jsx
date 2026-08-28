@@ -36,10 +36,10 @@ export default function PreCheck({ onDone, onSkip }) {
             changed.
           </p>
           <div style={s.actions}>
-            <button onClick={() => setPhase('quiz')} style={s.primary}>
+            <button type="button" onClick={() => setPhase('quiz')} style={s.primary}>
               Start the check
             </button>
-            <button onClick={onSkip} style={s.secondary}>
+            <button type="button" onClick={onSkip} style={s.secondary}>
               Skip for now
             </button>
           </div>
@@ -75,7 +75,7 @@ export default function PreCheck({ onDone, onSkip }) {
           shows what it teaches.
         </p>
         <div style={s.actions}>
-          <button onClick={() => onDone(answers)} style={s.primary}>
+          <button type="button" onClick={() => onDone(answers)} style={s.primary}>
             Start rating personas
           </button>
         </div>

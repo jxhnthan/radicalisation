@@ -1,4 +1,4 @@
-"""Integration tests for the FastAPI backend (LLM mocked)."""
+# Integration tests for the FastAPI backend (LLM judge mocked).
 import sys
 from pathlib import Path
 
@@ -25,7 +25,7 @@ CANNED = {
 }
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(monkeypatch):
     # Replace the LLM judge so tests never hit Ollama.
     monkeypatch.setattr(app, "judge_persona", lambda row: CANNED)

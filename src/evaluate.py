@@ -1,13 +1,5 @@
-"""Evaluate indicator-detection on the labelled set.
-
-Metrics:
-- Rule-based scorer: precision/recall/F1/ROC-AUC on all 1,000 (flag >= 3).
-- LLM judge (if data/analyses.json exists): same metrics on the precomputed pool.
-- Agreement between rule-based and LLM judge (Pearson on signal, Cohen's kappa
-  on the flag).
-
-Writes data/evaluation_results.json and prints a report.
-"""
+# Evaluates indicator detection on the labelled set: rule-based vs LLM-judge
+# metrics plus agreement. Writes data/evaluation_results.json and prints a report.
 from __future__ import annotations
 
 import json
@@ -56,6 +48,47 @@ def _pearson(a, b) -> float:
     return float(getattr(r, "statistic", r[0]))
 
 
+def _class_rates(df: pd.DataFrame, uuid_fn) -> dict:
+    # Per-class detection rates; hard-negative is the over-firing check (how
+    # often ordinary discontent is wrongly flagged).
+    rates = {}
+    classes = df["class_label"].unique() if "class_label" in df.columns else ["all"]
+    for cls in classes:
+        sub = df[df["class_label"] == cls]
+        flagged = sum(1 for u in sub["uuid"] if uuid_fn(u))
+        rates[str(cls)] = {"n": int(len(sub)), "flagged": int(flagged)}
+    return rates
+
+
+def _llm_judge(df: pd.DataFrame, rule_by_uuid: dict) -> dict | None:
+    # Metrics on the precomputed LLM pool plus rule/judge agreement. Returns
+    # None when analyses.json is not ready so run() can report a pending status.
+    if not ANALYSES_PATH.exists():
+        return None
+    analyses = json.loads(ANALYSES_PATH.read_text(encoding="utf-8"))
+    sub = df[df["uuid"].isin(analyses)]
+    sub_y = sub["label"].astype(int).values
+    sub_sig = np.array([analyses[u].get("signal", 0) for u in sub["uuid"]])
+    sub_flag = np.array([analyses[u].get("flagged", False) for u in sub["uuid"]])
+    rule_sig_sub = np.array([rule_by_uuid[u]["signal"] for u in sub["uuid"]])
+    rule_flag_sub = np.array([rule_by_uuid[u]["flagged"] for u in sub["uuid"]])
+
+    llm = _metrics(sub_y, sub_flag, sub_sig)
+    llm["per_class"] = _class_rates(
+        df, lambda u: analyses.get(u, {}).get("flagged", False)
+    )
+    hn = llm["per_class"].get("hard_negative")
+    hn_fp = round(hn["flagged"] / max(1, hn["n"]), 3) if hn else None
+    agreement = {
+        "n": int(len(sub)),
+        "signal_pearson": round(_pearson(sub_sig, rule_sig_sub), 3),
+        "flag_cohens_kappa": round(
+            float(cohen_kappa_score(sub_flag, rule_flag_sub)), 3
+        ),
+    }
+    return {"llm_judge": llm, "agreement": agreement, "hn_fp": hn_fp}
+
+
 def run() -> dict:
     df = pd.read_csv(LABELLED_CSV)
     uuids = df["uuid"].tolist()
@@ -72,49 +105,22 @@ def run() -> dict:
         "rule_based": _metrics(y, rule_flag, rule_signal),
         "note": "Precision/recall are at the flag threshold (signal >= 3).",
     }
-
-    # Per-class detection rates; the hard-negative class is the key over-firing
-    # check (how often ordinary discontent is falsely flagged).
-    def class_rates(uuid_fn):
-        rates = {}
-        classes = df["class_label"].unique() if "class_label" in df.columns else ["all"]
-        for cls in classes:
-            sub = df[df["class_label"] == cls]
-            flagged = sum(1 for u in sub["uuid"] if uuid_fn(u))
-            rates[str(cls)] = {"n": int(len(sub)), "flagged": int(flagged)}
-        return rates
-
-    results["rule_based"]["per_class"] = class_rates(lambda u: rule_by_uuid[u]["flagged"])
+    results["rule_based"]["per_class"] = _class_rates(
+        df, lambda u: rule_by_uuid[u]["flagged"]
+    )
     results["hard_negative_fp_rate"] = {}
-    if "hard_negative" in results["rule_based"]["per_class"]:
-        hn = results["rule_based"]["per_class"]["hard_negative"]
-        results["hard_negative_fp_rate"]["rule_based"] = round(hn["flagged"] / max(1, hn["n"]), 3)
-
-    if ANALYSES_PATH.exists():
-        analyses = json.loads(ANALYSES_PATH.read_text(encoding="utf-8"))
-        sub = df[df["uuid"].isin(analyses)]
-        sub_y = sub["label"].astype(int).values
-        sub_sig = np.array([analyses[u].get("signal", 0) for u in sub["uuid"]])
-        sub_flag = np.array([analyses[u].get("flagged", False) for u in sub["uuid"]])
-        results["llm_judge"] = _metrics(sub_y, sub_flag, sub_sig)
-        results["llm_judge"]["per_class"] = class_rates(
-            lambda u: analyses.get(u, {}).get("flagged", False)
+    rule_hn = results["rule_based"]["per_class"].get("hard_negative")
+    if rule_hn:
+        results["hard_negative_fp_rate"]["rule_based"] = round(
+            rule_hn["flagged"] / max(1, rule_hn["n"]), 3
         )
-        if "hard_negative" in results["llm_judge"]["per_class"]:
-            hn = results["llm_judge"]["per_class"]["hard_negative"]
-            results["hard_negative_fp_rate"]["llm_judge"] = round(
-                hn["flagged"] / max(1, hn["n"]), 3
-            )
 
-        rule_sig_sub = np.array([rule_by_uuid[u]["signal"] for u in sub["uuid"]])
-        rule_flag_sub = np.array([rule_by_uuid[u]["flagged"] for u in sub["uuid"]])
-        results["agreement"] = {
-            "n": int(len(sub)),
-            "signal_pearson": round(_pearson(sub_sig, rule_sig_sub), 3),
-            "flag_cohens_kappa": round(
-                float(cohen_kappa_score(sub_flag, rule_flag_sub)), 3
-            ),
-        }
+    llm = _llm_judge(df, rule_by_uuid)
+    if llm is not None:
+        results["llm_judge"] = llm["llm_judge"]
+        results["agreement"] = llm["agreement"]
+        if llm["hn_fp"] is not None:
+            results["hard_negative_fp_rate"]["llm_judge"] = llm["hn_fp"]
     else:
         results["llm_judge"] = "pending (analyses.json not ready)"
 

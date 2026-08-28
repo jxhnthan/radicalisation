@@ -1,13 +1,5 @@
-"""FastAPI backend for the Radicalisation Awareness app.
-
-Runs fully locally: serves synthetic personas from the labelled dataset and uses
-the local Ollama LLM to produce an indicator analysis for the "reveal" step.
-The app is a public-education exercise on synthetic data, not an assessment of
-real people.
-
-Run (from the project root):
-    .venv/bin/uvicorn backend.app:app --reload --port 8000
-"""
+# FastAPI backend for the Radicalisation Awareness app. Serves synthetic
+# personas locally and produces the indicator analysis for the "reveal" step.
 from __future__ import annotations
 
 import json
@@ -48,7 +40,8 @@ TEXT_FIELDS = [
 app = FastAPI(title="Radicalisation Awareness", version="0.1")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # local dev/demo only
+    # Local dev/demo only.
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -58,7 +51,7 @@ _analysis_cache: dict[str, dict] = {}
 
 
 def _load_analyses() -> None:
-    """Load precomputed judge analyses so reveal is instant and offline."""
+    # Preload judge analyses so the reveal step is instant and offline.
     if ANALYSES_PATH.exists():
         with open(ANALYSES_PATH, encoding="utf-8") as f:
             _analysis_cache.update(json.load(f))
@@ -81,12 +74,12 @@ def load_pool() -> pd.DataFrame:
 
 
 def persona_public(row) -> dict:
-    """Persona fields shown to the user (no label / injected factors)."""
+    # Fields shown to the user - never the label or injected factors.
     return {"uuid": row["uuid"], **{f: row[f] for f in TEXT_FIELDS}}
 
 
 def judge_persona(row) -> dict:
-    """Run the LLM judge on a persona, caching by uuid."""
+    # Run the LLM judge on a persona, caching results by uuid.
     uuid = row["uuid"]
     if uuid in _analysis_cache:
         return _analysis_cache[uuid]
@@ -119,7 +112,8 @@ def judge_persona(row) -> dict:
 
 class RevealRequest(BaseModel):
     uuid: str
-    guess: int  # 1-5 likelihood the user would report
+    # 1-5 likelihood the user would report the persona.
+    guess: int
 
 
 def educational_note() -> str:
@@ -145,12 +139,15 @@ def get_persona(session: str = "") -> dict:
     pool = load_pool()
     seen = _seen.setdefault(session, set())
     unseen = pool[~pool["uuid"].isin(seen)]
-    if len(unseen) == 0:  # pool exhausted for this session -> reset
+    # Pool exhausted for this session -> reset and start over.
+    if len(unseen) == 0:
         seen.clear()
         unseen = pool
     pos = unseen[unseen["label"] == 1]
     neg = unseen[unseen["label"] == 0]
-    if random.random() < POSITIVE_PROB and len(pos) > 0:
+    # Non-security sampling: decide which persona class to serve next. The
+    # standard PRNG is fine here - nothing sensitive depends on this choice.
+    if random.random() < POSITIVE_PROB and len(pos) > 0:  # NOSONAR
         row = pos.sample(1).iloc[0]
     elif len(neg) > 0:
         row = neg.sample(1).iloc[0]
@@ -192,10 +189,7 @@ def health() -> dict:
 
 @app.get("/api/performance")
 def performance() -> dict:
-    """Measured detector accuracy on the synthetic labelled set.
-
-    Served read-only from the evaluation output for in-app transparency.
-    """
+    # Measured detector accuracy, served read-only for in-app transparency.
     path = PROJECT_ROOT / "data" / "evaluation_results.json"
     if not path.exists():
         return {"available": False}
@@ -205,8 +199,7 @@ def performance() -> dict:
 
 
 class SessionPayload(BaseModel):
-    """Anonymized, opt-in session upload. No PII - just counts and quiz scores."""
-
+    # Anonymized, opt-in session upload - counts and quiz scores only, no PII.
     session_id: str = ""
     stats: dict = {}
     vouchers: dict = {}
@@ -219,11 +212,7 @@ class SessionPayload(BaseModel):
 
 @app.post("/api/sessions")
 def submit_session(payload: SessionPayload) -> dict:
-    """Upsert one anonymized session keyed by session_id (idempotent).
-
-    Auto-uploading from the same browser session repeatedly replaces the
-    earlier row rather than appending, so the store keeps one row per session.
-    """
+    # Upsert by session_id so the store keeps one row per browser session.
     ADMIN_DIR.mkdir(parents=True, exist_ok=True)
     row = payload.model_dump()
     sid = str(row.get("session_id") or "")
@@ -253,57 +242,69 @@ def _load_sessions() -> list[dict]:
     return rows
 
 
-@app.get("/api/admin/summary")
-def admin_summary() -> dict:
-    """Aggregate uploaded sessions and test whether quiz knowledge change is
-    significant (paired pre/post scores, Wilcoxon signed-rank with a paired-t
-    fallback, plus Cohen's d effect size).
-    """
-    rows = _load_sessions()
-    n = len(rows)
-    rated = sum(int(r.get("stats", {}).get("rated", 0) or 0) for r in rows)
-    correct = sum(int(r.get("stats", {}).get("correct", 0) or 0) for r in rows)
-    false_alarm = sum(int(r.get("stats", {}).get("falseAlarm", 0) or 0) for r in rows)
-    missed = sum(int(r.get("stats", {}).get("miss", 0) or 0) for r in rows)
-
+def _collect_pairs(rows: list[dict]) -> list[tuple[float, float]]:
     pairs: list[tuple[float, float]] = []
     for r in rows:
         pre, post = r.get("pre_score"), r.get("post_score")
         if isinstance(pre, (int, float)) and isinstance(post, (int, float)):
             pairs.append((float(pre), float(post)))
+    return pairs
 
-    quiz: dict | None = None
-    if len(pairs) >= 2:
-        pre_arr = np.array([p[0] for p in pairs])
-        post_arr = np.array([p[1] for p in pairs])
-        diff = post_arr - pre_arr
-        mean_diff = float(diff.mean())
-        sd_diff = float(diff.std(ddof=1)) if len(diff) > 1 else 0.0
-        p_value: float | None = None
-        test: str | None = None
-        if (diff != 0).sum() > 0:
-            try:
-                _, p_value = scipy_stats.wilcoxon(diff, zero_method="wilcox")
-                test = "wilcoxon"
-            except ValueError:
-                _, p_value = scipy_stats.ttest_rel(post_arr, pre_arr)
-                test = "paired t"
-        quiz = {
-            "n_pairs": len(pairs),
-            "mean_pre": round(float(pre_arr.mean()), 2),
-            "mean_post": round(float(post_arr.mean()), 2),
-            "mean_diff": round(mean_diff, 2),
-            "sd_diff": round(sd_diff, 2),
-            "p_value": round(float(p_value), 4) if p_value is not None else None,
-            "test": test,
-            "cohens_d": round(mean_diff / sd_diff, 2) if sd_diff > 0 else None,
-            "significant": bool(p_value is not None and p_value < 0.05 and mean_diff > 0),
-            "direction": "improvement" if mean_diff > 0 else "decline" if mean_diff < 0 else "no change",
-            "pairs": [[round(a, 1), round(b, 1)] for a, b in pairs],
-        }
+
+def _direction(mean_diff: float) -> str:
+    if mean_diff > 0:
+        return "improvement"
+    if mean_diff < 0:
+        return "decline"
+    return "no change"
+
+
+def _quiz_stats(pairs: list[tuple[float, float]]) -> dict | None:
+    # Wilcoxon signed-rank with a paired-t fallback for the pre/post scores.
+    if len(pairs) < 2:
+        return None
+    pre_arr = np.array([p[0] for p in pairs])
+    post_arr = np.array([p[1] for p in pairs])
+    diff = post_arr - pre_arr
+    mean_diff = float(diff.mean())
+    sd_diff = float(diff.std(ddof=1)) if len(diff) > 1 else 0.0
+    p_value: float | None = None
+    test: str | None = None
+    if (diff != 0).sum() > 0:
+        try:
+            _, p_value = scipy_stats.wilcoxon(diff, zero_method="wilcox")
+            test = "wilcoxon"
+        except ValueError:
+            _, p_value = scipy_stats.ttest_rel(post_arr, pre_arr)
+            test = "paired t"
+    return {
+        "n_pairs": len(pairs),
+        "mean_pre": round(float(pre_arr.mean()), 2),
+        "mean_post": round(float(post_arr.mean()), 2),
+        "mean_diff": round(mean_diff, 2),
+        "sd_diff": round(sd_diff, 2),
+        "p_value": round(float(p_value), 4) if p_value is not None else None,
+        "test": test,
+        "cohens_d": round(mean_diff / sd_diff, 2) if sd_diff > 0 else None,
+        "significant": bool(p_value is not None and p_value < 0.05 and mean_diff > 0),
+        "direction": _direction(mean_diff),
+        "pairs": [[round(a, 1), round(b, 1)] for a, b in pairs],
+    }
+
+
+@app.get("/api/admin/summary")
+def admin_summary() -> dict:
+    # Aggregates sessions and tests whether the pre/post quiz change is
+    # significant (Wilcoxon with paired-t fallback, plus Cohen's d).
+    rows = _load_sessions()
+    rated = sum(int(r.get("stats", {}).get("rated", 0) or 0) for r in rows)
+    correct = sum(int(r.get("stats", {}).get("correct", 0) or 0) for r in rows)
+    false_alarm = sum(int(r.get("stats", {}).get("falseAlarm", 0) or 0) for r in rows)
+    missed = sum(int(r.get("stats", {}).get("miss", 0) or 0) for r in rows)
+    quiz = _quiz_stats(_collect_pairs(rows))
 
     return {
-        "n_sessions": n,
+        "n_sessions": len(rows),
         "simulated": sum(
             1 for r in rows if str(r.get("session_id", "")).startswith("sim-")
         ),
@@ -317,25 +318,24 @@ def admin_summary() -> dict:
 
 
 def _sample_sessions(n: int) -> list[dict]:
-    """Deterministic, clearly-marked sample sessions for demo purposes.
-
-    Pre scores hover around 4-5/8 and post around 6-7/8 so the paired test
-    shows a clear improvement - a reviewer can see the populated dashboard.
-    """
-    rng = random.Random(42)
+    # Clearly-marked demo sessions (pre ~4-5/8, post ~6-7/8) so a reviewer sees
+    # a populated dashboard and a clear improvement without real uploads.
+    # Deterministic demo data, not security-sensitive - a seeded PRNG is
+    # intentional so the simulated sessions are reproducible.
+    rng = random.Random(42)  # NOSONAR
     rows: list[dict] = []
     for i in range(n):
         pre = round(min(8, max(0, 4.0 + rng.uniform(-1.0, 1.5))), 1)
         post = round(min(8, max(0, 6.4 + rng.uniform(-0.8, 1.0))), 1)
-        rated = rng.randint(5, 12)
-        correct = min(rated, rng.randint(2, max(3, rated)))
+        rated = rng.randint(5, 12)  # NOSONAR
+        correct = min(rated, rng.randint(2, max(3, rated)))  # NOSONAR
         rows.append(
             {
                 "session_id": f"sim-{i}",
                 "stats": {
                     "rated": rated,
                     "correct": correct,
-                    "falseAlarm": rng.randint(0, 2),
+                    "falseAlarm": rng.randint(0, 2),  # NOSONAR
                     "miss": max(0, rated - correct),
                     "streak": 0,
                     "bestStreak": 0,
@@ -353,7 +353,7 @@ def _sample_sessions(n: int) -> list[dict]:
 
 @app.post("/api/admin/simulate")
 def admin_simulate(n: int = 15) -> dict:
-    """Seed the store with sample sessions (ids prefixed 'sim-'). Idempotent."""
+    # Seeds the store with 'sim-'-prefixed sample sessions (idempotent).
     existing = {r.get("session_id") for r in _load_sessions()}
     ADMIN_DIR.mkdir(parents=True, exist_ok=True)
     added = 0
@@ -368,7 +368,7 @@ def admin_simulate(n: int = 15) -> dict:
 
 @app.post("/api/admin/clear-simulated")
 def admin_clear_simulated() -> dict:
-    """Remove only the simulated sessions (keep real uploads)."""
+    # Removes only the simulated sessions, keeping real uploads.
     rows = _load_sessions()
     keep = [r for r in rows if not str(r.get("session_id", "")).startswith("sim-")]
     ADMIN_DIR.mkdir(parents=True, exist_ok=True)

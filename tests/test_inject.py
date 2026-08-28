@@ -1,4 +1,4 @@
-"""Unit tests for the injection helpers."""
+# Unit tests for the injection helpers.
 import json
 import sys
 from pathlib import Path
@@ -47,4 +47,5 @@ def test_select_subset_deterministic():
     assert a == b
     assert a != c
     assert len(a) == 10
-    assert len(set(a)) == 10  # no duplicates
+    # No duplicates.
+    assert len(set(a)) == 10

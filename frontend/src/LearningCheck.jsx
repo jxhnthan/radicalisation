@@ -23,6 +23,11 @@ export default function LearningCheck({ stats, pre, post, onPre, onPost }) {
 
   const postLocked = stats.rated < POST_MIN_RATED
   const preScore = pre ? scoreQuiz(pre.answers) : null
+  const remainingRatings = POST_MIN_RATED - stats.rated
+  const ratingWord = remainingRatings === 1 ? 'rating' : 'ratings'
+  const postHint = postLocked
+    ? ` Take the post-check after ${remainingRatings} more ${ratingWord}.`
+    : ' You can now take the post-check.'
 
   useEffect(() => {
     if (show) {
@@ -70,7 +75,7 @@ export default function LearningCheck({ stats, pre, post, onPre, onPost }) {
               You skipped the pre-check. You can still take it now - it only
               matters if you take it again later for comparison.
             </p>
-            <button onClick={() => open('pre')} style={s.primary}>
+            <button type="button" onClick={() => open('pre')} style={s.primary}>
               Take the pre-check
             </button>
           </>
@@ -80,12 +85,10 @@ export default function LearningCheck({ stats, pre, post, onPre, onPost }) {
           <>
             <p style={s.hint}>
               Pre-check: <strong>{preScore.total}/{preScore.max}</strong>.
-              {postLocked
-                ? ` Take the post-check after ${POST_MIN_RATED - stats.rated} more rating${stats.rated === POST_MIN_RATED - 1 ? '' : 's'}.`
-                : ' You can now take the post-check.'}
+              {postHint}
             </p>
             {!postLocked && (
-              <button onClick={() => open('post')} style={s.primary}>
+              <button type="button" onClick={() => open('post')} style={s.primary}>
                 Take the post-check
               </button>
             )}
@@ -98,7 +101,7 @@ export default function LearningCheck({ stats, pre, post, onPre, onPost }) {
       <dialog ref={dialogRef} style={s.dialog}>
         <div style={s.modalHead}>
           <span style={s.title}>{mode === 'post' ? 'Post-check' : 'Pre-check'}</span>
-          <button onClick={() => setShow(false)} style={s.closeBtn} aria-label="Close">
+          <button type="button" onClick={() => setShow(false)} style={s.closeBtn} aria-label="Close">
             ×
           </button>
         </div>
@@ -112,13 +115,18 @@ export default function LearningCheck({ stats, pre, post, onPre, onPost }) {
   )
 }
 
+function deltaView(delta) {
+  if (delta > 0) return { style: s.up, text: `+${delta}` }
+  if (delta < 0) return { style: s.down, text: `${delta}` }
+  return { style: s.same, text: 'no change' }
+}
+
 function Comparison({ pre, post }) {
   const preScore = scoreQuiz(pre.answers)
   const postScore = scoreQuiz(post.answers)
   const delta = Math.round(postScore.total - preScore.total)
   const pct = Math.round((postScore.total / postScore.max) * 100)
-  const deltaStyle = delta > 0 ? s.up : delta < 0 ? s.down : s.same
-  const deltaText = delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : 'no change'
+  const { style: deltaStyle, text: deltaText } = deltaView(delta)
 
   return (
     <div>

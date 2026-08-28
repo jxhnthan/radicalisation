@@ -1,17 +1,6 @@
-"""Phase 2: LLM-based indicator injection.
-
-Selects N personas from the 1,000-persona sample and asks an LLM to rewrite them
-so they carry radicalisation-vulnerability indicators (CVE literature). The
-result is a labelled dataset: originals (label=0) plus rewritten (label=1).
-
-Writes:
-  data/labelled_personas.csv   - all 1,000 rows (900 label=0 + 100 label=1)
-  data/injection_log.jsonl     - audit log per rewritten persona (prompt, raw output, factors)
-
-Usage:
-  LLM_BASE_URL=... LLM_API_KEY=... LLM_MODEL=... python -m src.inject_indicators --n 100
-  python -m src.inject_indicators --dry-run   # no API call; verifies the pipeline
-"""
+# Phase 2: selects personas from the sample and asks a local LLM to rewrite
+# them so they carry CVE vulnerability indicators. Writes the labelled set
+# (data/labelled_personas.csv) + an audit log (data/injection_log.jsonl).
 from __future__ import annotations
 
 import argparse
@@ -74,7 +63,7 @@ FACTOR_ALIASES = {
 
 
 def normalise_factors(factors) -> list[str]:
-    """Map LLM factor names to canonical keys, dropping unknowns."""
+    # Map LLM factor names to canonical keys, dropping unknowns.
     if not isinstance(factors, list):
         return []
     out: list[str] = []
@@ -107,7 +96,7 @@ def build_messages(persona_row: dict) -> list[dict]:
 
 
 def parse_output(raw: str) -> dict:
-    """Parse the LLM response as JSON, tolerating markdown code fences."""
+    # Parse the LLM response as JSON, tolerating markdown code fences.
     raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.strip("`").strip()
@@ -117,7 +106,19 @@ def parse_output(raw: str) -> dict:
 
 
 def select_subset(df: pd.DataFrame, n: int, seed: int) -> list[int]:
-    return random.Random(seed).sample(list(df.index), n)
+    # Seeded, reproducible sampling for a controlled dataset - not security-
+    # relevant, so the deterministic PRNG is intentional.
+    return random.Random(seed).sample(list(df.index), n)  # NOSONAR
+
+
+def _label_row(df: pd.DataFrame, row_idx: int, out: dict) -> None:
+    for f in REWRITE_FIELDS:
+        if isinstance(out.get(f), str):
+            df.loc[row_idx, f] = out[f]
+    df.loc[row_idx, "label"] = 1
+    df.loc[row_idx, "injected_factors"] = ",".join(
+        normalise_factors(out.get("injected_factors"))
+    )
 
 
 def run(n: int, seed: int = 42, dry_run: bool = False) -> None:
@@ -149,11 +150,7 @@ def run(n: int, seed: int = 42, dry_run: bool = False) -> None:
             log.write(json.dumps({"uuid": row["uuid"], "prompt": messages, "raw": raw, "parsed": out}, ensure_ascii=False) + "\n")
             log.flush()
 
-        for f in REWRITE_FIELDS:
-            if isinstance(out.get(f), str):
-                df.loc[row_idx, f] = out[f]
-        df.loc[row_idx, "label"] = 1
-        df.loc[row_idx, "injected_factors"] = ",".join(normalise_factors(out.get("injected_factors")))
+        _label_row(df, row_idx, out)
         n_ok += 1
 
         # Persist after every rewrite so the dataset is visible while running.

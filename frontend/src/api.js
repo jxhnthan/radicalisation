@@ -1,23 +1,40 @@
 const API = '/api'
 export const SESSION_KEY = 'radicalisation-aw-session'
 
+function storageGet(key) {
+  try {
+    return localStorage.getItem(key)
+  } catch (e) {
+    // localStorage can be unavailable (private mode) - degrade gracefully.
+    console.warn('localStorage unavailable:', e)
+    return null
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    localStorage.setItem(key, value)
+  } catch (e) {
+    console.warn('localStorage unavailable:', e)
+  }
+}
+
+// Cryptographically random session id (stable per browser). Uses the Web Crypto
+// API rather than Math.random so the id is not predictable; works offline and
+// in all modern browsers.
+function newSessionId() {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 // A per-browser session id lets the backend serve each persona at most once
 // per session (no repeats during a demo). Persists across reloads.
 function sessionId() {
-  let s
-  try {
-    s = localStorage.getItem(SESSION_KEY)
-  } catch (e) {
-    /* ignore */
-  }
-  if (!s) {
-    s = Math.random().toString(36).slice(2) + Date.now().toString(36)
-    try {
-      localStorage.setItem(SESSION_KEY, s)
-    } catch (e) {
-      /* ignore */
-    }
-  }
+  const stored = storageGet(SESSION_KEY)
+  if (stored) return stored
+  const s = newSessionId()
+  storageSet(SESSION_KEY, s)
   return s
 }
 

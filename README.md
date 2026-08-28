@@ -25,24 +25,24 @@ An AI prototype that evaluates whether LLM-based methods can surface radicalisat
 
 Here's a walkthrough of the whole data pipeline that this project is using:
 
-1. **Obtaining personas.** The initial dataset comprises 148k synthetic Singaporeans, each consisting of demographic variables (age, job, hobbies, cultural background) that mirror the real Singaporean population before randomly sampling 1,000 individuals for this project.
+1. **Obtaining personas.** The initial dataset (obtained from NVIDIA Nemotron) comprises 148k synthetic Singaporeans, each consisting of demographic variables (age, job, hobbies, cultural background) that mirror the real Singaporean population. For feasability purposes, we randomly sample 1,000 individuals for this project.
 
-2. **Make some carry risk signals.** We chose not to add new individuals to the existing dataset. Instead, we used a local LLM to rewrite 300 of the 1,000 personas (30%) into three distinct rewrite types, so the resulting labels reflect genuine risk-language detection rather than a classification task to determine if the persona was rewritten. Of the 300 personas, there are 3 main categories:
+2. **Make some personas carry risk signals.** We chose not to add new individuals to the existing dataset. Instead, we used a local LLM to rewrite 300 of the 1,000 personas (30%) into three distinct rewrite types, so the resulting labels reflect genuine risk-language detection rather than a classification task to determine if the persona was rewritten. Of the 300 personas, there are 3 main categories:
 
-- 2(a) 150 "full indicator" personas: rewritten to openly express the complete cluster of radicalisation-vulnerability indicators from existing counter-extremism research: feeling passed over, "the system is rigged," "us vs them" thinking, pulling away from family and friends, distrusting institutions.
+- 150 "full indicator" personas: rewritten to openly express the complete cluster of radicalisation-vulnerability indicators from existing counter-extremism research: feeling passed over, "the system is rigged," "us vs them" thinking, pulling away from family and friends, distrusting institutions.
 
-- 2(b) 50 "partial indicator" personas: rewritten with only one or two of these markers embedded subtly, to test sensitivity at the margin rather than only on obvious cases.
+- 50 "partial indicator" personas: rewritten with only one or two of these markers embedded subtly, to test sensitivity at the margin rather than only on obvious cases.
 
-- 2(c) 100 "hard negative" personas: rewritten to sound frustrated, cynical, or withdrawn for ordinary, non-extremism reasons (e.g., generic bureaucratic frustration, burnout, grief-related withdrawal, general political cynicism), without any of the specific vulnerability markers. These exist to test whether the detector overfires on everyday discontent, which is common and not itself a risk signal.
+- 100 "hard negative" personas: rewritten to sound frustrated, cynical, or withdrawn for ordinary, non-extremism reasons (e.g., generic bureaucratic frustration, burnout, grief-related withdrawal, general political cynicism), without any of the specific vulnerability markers. These exist to test whether the detector overfires on everyday discontent, which is common and not itself a risk signal.
 
 3. **This approach creates a labelled test set.** 700 personas stay unchanged
-   (baseline). Detection positives are full + partial indicators (200);
+   (baseline). Detection positives are full + partial indicators (200); 
    negatives are baseline + hard negatives (800). 
 
-4. **Next, we try to detect them.** we extract text features: sentiment, anger/negative
-   words, topics and test whether a detector can tell the 200 positive personas
-   apart from the 800 negatives, which signals it relies on, and whether it
-   over-fires on the hard negatives.
+4. **Next, we try to detect them.** We extract text features: sentiment, anger and
+   negative words, and topics, then test whether a detector can tell the 200
+   positive personas apart from the 800 negatives, which signals it relies on,
+   and whether it over-fires on the hard negatives.
 
 5. **Finally, we measure accuracy.** we report precision/recall (not accuracy) and
    cross-check a rule-based detector against an LLM judge. Everything is
@@ -104,11 +104,11 @@ How can we develop and evaluate AI-assisted detection of potential radicalisatio
 
 3. Develop and evaluate a detection pipeline that identifies the injected psychosocial indicators, assessing both overall classification performance and which individual indicators are most reliably detected.
 
-4. Translate the findings into a public-education prototype using a guess-then-reveal interface. A pre/post learning check measures whether exposure to the AI's reasoning changes how users assess potential risk.
+4. Translate the findings into a public-education prototype using a guess-then-reveal interface. A pre/post learning check measures whether exposure to the AI's reasoning changes how users assess potential risk. Results are then surfaced to an admin dashboard for longitudinal tracking purposes.
 
 **Rationale**
 
-The source dataset contains synthetic persona descriptions, not observations of real-world behaviour. It therefore cannot establish whether any individual is radicalised, nor should the resulting model be interpreted as a tool for making person-level radicalisation judgements.
+The source dataset contains synthetic persona descriptions, not observations of real-world behaviour. Therefore, the results cannot establish whether any individual is radicalised, nor should the resulting model be interpreted as a tool for making person-level radicalisation judgements.
 
 Instead, we test a narrower question:
 - Can AI detect specific psychosocial indicators associated with radicalisation vulnerability when they appear in text?

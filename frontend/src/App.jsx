@@ -77,70 +77,86 @@ const MERCH = {
   Gold: { item: 'ISD black hoodie' },
 }
 
-// Voucher codes are generated client-side from a seeded PRNG so each unlock
+// Voucher codes are generated client-side from a seeded hash so each unlock
 // produces a stable, unique-looking code for the gamification concept.
-const VOUCHER_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no 0/O/1/I
+// Character set excludes 0/O/1/I to avoid ambiguity.
+const VOUCHER_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
 function seedFor(name) {
-  let h = 2166136261 // FNV-1a
+  // FNV-1a hash of the name -> a stable 32-bit seed.
+  let h = 2166136261
   for (const c of name) {
-    h ^= c.charCodeAt(0)
+    h ^= c.codePointAt(0)
     h = Math.imul(h, 16777619)
   }
   return h >>> 0
 }
 
 function makeVoucherCode(seed) {
-  const rand = (() => {
-    let a = seed >>> 0
-    return () => {
-      a |= 0
-      a = (a + 0x6d2b79f5) | 0
-      let t = Math.imul(a ^ (a >>> 15), 1 | a)
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-    }
-  })()
-  const block = () =>
-    Array.from(
-      { length: 4 },
-      () => VOUCHER_CHARS[Math.floor(rand() * VOUCHER_CHARS.length)]
-    ).join('')
-  return `ISD-${block()}-${block()}`
+  // Deterministic voucher codes: hash the seed with a per-position salt to pick
+  // characters, so the same badge always yields the same code (no PRNG needed).
+  const block = (salt) =>
+    Array.from({ length: 4 }, (_, i) => {
+      const h = seedFor(`${seed}:${salt}:${i}`)
+      return VOUCHER_CHARS[h % VOUCHER_CHARS.length]
+    }).join('')
+  return `ISD-${block(0)}-${block(1)}`
+}
+
+function storageGet(key) {
+  try {
+    return localStorage.getItem(key)
+  } catch (e) {
+    // localStorage can be unavailable (private/restricted mode) - degrade.
+    console.warn('localStorage unavailable:', e)
+    return null
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    localStorage.setItem(key, value)
+  } catch (e) {
+    console.warn('localStorage unavailable:', e)
+  }
+}
+
+function storageRemove(key) {
+  try {
+    localStorage.removeItem(key)
+  } catch (e) {
+    console.warn('localStorage unavailable:', e)
+  }
 }
 
 function loadVouchers() {
+  const raw = storageGet(VOUCHER_KEY)
+  if (!raw) return {}
   try {
-    return JSON.parse(localStorage.getItem(VOUCHER_KEY)) || {}
+    return JSON.parse(raw)
   } catch (e) {
+    console.warn('corrupt voucher data:', e)
     return {}
   }
 }
 
 function saveVouchers(vouchers) {
-  try {
-    localStorage.setItem(VOUCHER_KEY, JSON.stringify(vouchers))
-  } catch (e) {
-    /* ignore */
-  }
+  storageSet(VOUCHER_KEY, JSON.stringify(vouchers))
 }
 
 function loadStats() {
+  const raw = storageGet(STORAGE_KEY)
+  if (!raw) return { ...EMPTY_STATS }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return { ...EMPTY_STATS, ...JSON.parse(raw) }
+    return { ...EMPTY_STATS, ...JSON.parse(raw) }
   } catch (e) {
-    /* ignore */
+    console.warn('corrupt stats data:', e)
+    return { ...EMPTY_STATS }
   }
-  return { ...EMPTY_STATS }
 }
 
 function saveStats(stats) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stats))
-  } catch (e) {
-    /* ignore */
-  }
+  storageSet(STORAGE_KEY, JSON.stringify(stats))
 }
 
 function classifyCall(guess, gt) {
@@ -224,7 +240,7 @@ function exportSession(stats, vouchers, format) {
       ['exported_at', new Date().toISOString()],
     ]
     const csv = rows
-      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .map((r) => r.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(','))
       .join('\n')
     downloadBlob(csv, `radicalisation-session-${date}.csv`, 'text/csv')
   } else {
@@ -241,6 +257,437 @@ function exportSession(stats, vouchers, format) {
       'application/json'
     )
   }
+}
+
+function Masthead({ isAdmin, onToggleAdmin, toolsOpen, setToolsOpen }) {
+  return (
+    <header style={s.masthead}>
+      <div style={s.brandRow}>
+        <span style={s.brand}>ISD</span>
+        <span style={s.brandSub}>Internal Security Department</span>
+        <span style={s.badge}>Public-education prototype</span>
+        <button type="button" onClick={onToggleAdmin} style={isAdmin ? s.adminToggleOn : s.adminToggle}>
+          {isAdmin ? 'View app' : 'Admin'}
+        </button>
+        {!isAdmin && (
+          <button
+            type="button"
+            onClick={() => setToolsOpen((v) => !v)}
+            style={s.toolsToggle}
+            aria-expanded={toolsOpen}
+            aria-controls="tools-panel"
+            title="Tools and session actions"
+            aria-label="Tools and session actions"
+          >
+            <WrenchIcon />
+          </button>
+        )}
+      </div>
+      <h1 style={s.h1}>Spotting the signs of radicalisation</h1>
+      <p className="sub-line" style={s.sub}>
+        Read a synthetic persona. Decide how likely you would be to report it. Then see what the AI detects and why.
+      </p>
+      <div style={s.caveatBox}>
+        <span style={s.caveatIcon} aria-hidden="true">
+          ⓘ
+        </span>
+        <span style={s.caveatText}>
+          Names are synthetic placeholders and may differ between fields.
+          Personas come from the{' '}
+          <a
+            href="https://huggingface.co/datasets/nvidia/Nemotron-Personas-Singapore"
+            target="_blank"
+            rel="noreferrer"
+            style={s.caveatLink}
+          >
+            Nemotron-Personas-Singapore
+          </a>{' '}
+          dataset (CC BY 4.0).
+        </span>
+      </div>
+    </header>
+  )
+}
+
+function ToolsSidebar({ onClose, onExportJson, onExportCsv, onReset }) {
+  return (
+    <>
+      <div style={s.sidebarOverlay} onClick={onClose} aria-hidden="true" />
+      <aside id="tools-panel" style={s.sidebar} aria-label="Tools">
+        <div style={s.sidebarHead}>
+          <span style={s.sidebarTitle}>
+            <WrenchIcon /> Tools
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            style={s.sidebarClose}
+            title="Close"
+            aria-label="Close tools"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <div style={s.sidebarBody}>
+          <button type="button" onClick={onExportJson} style={s.exportBtn} title="Download session as JSON">
+            <DownloadIcon /> Export JSON
+          </button>
+          <button type="button" onClick={onExportCsv} style={s.exportBtn} title="Download session as CSV">
+            <DownloadIcon /> Export CSV
+          </button>
+          <button type="button" onClick={onReset} style={s.resetBtn} title="Reset this session">
+            <ResetIcon /> Reset
+          </button>
+          <a href="#/admin" style={s.exportLink} title="Admin dashboard">
+            <ChartIcon /> Admin
+          </a>
+        </div>
+      </aside>
+    </>
+  )
+}
+
+function StatsBar({ stats }) {
+  return (
+    <div style={s.statsBar}>
+      <div style={s.statsGrid}>
+        <div style={s.statCard}>
+          <div style={s.statNum}>{stats.rated}</div>
+          <div style={s.trackLabel}>Rated</div>
+        </div>
+        <div style={s.statCard}>
+          <div
+            style={{ ...s.statNum, ...(stats.correct > 0 ? s.numAccent : {}) }}
+          >
+            {stats.correct}
+          </div>
+          <div style={s.trackLabel}>Correct</div>
+        </div>
+        <div style={s.statCard}>
+          <div
+            style={{ ...s.statNum, ...(stats.falseAlarm > 0 ? s.numRed : {}) }}
+          >
+            {stats.falseAlarm}
+          </div>
+          <div style={s.trackLabel}>False alarms</div>
+        </div>
+        <div style={s.statCard}>
+          <div style={{ ...s.statNum, ...(stats.miss > 0 ? s.numRed : {}) }}>
+            {stats.miss}
+          </div>
+          <div style={s.trackLabel}>Missed</div>
+        </div>
+        <div
+          style={{ ...s.statCard, ...(stats.streak > 0 ? s.streakCard : {}) }}
+        >
+          <div style={{ ...s.statNum, ...(stats.streak > 0 ? s.streakNum : {}) }}>
+            {stats.streak}
+          </div>
+          <div style={s.trackLabel}>Streak</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RewardsCard({ stats, vouchers, openVoucher, setOpenVoucher, ensureVoucher, copyVoucher, copied }) {
+  return (
+    <section style={s.rewardsWrap}>
+      <div style={s.rewardsCard}>
+        <div style={s.rewardsTitle}>Unlock rewards</div>
+        <p style={s.rewardsHint}>
+          Correct calls unlock badges. Each badge comes with a proposed ISD
+          merch voucher to claim.
+        </p>
+        <div style={s.badgesRow}>
+          {BADGES.map((b) => {
+            const earned = stats.correct >= b.need
+            return (
+              <div key={b.name} style={s.badgeCell}>
+                <img
+                  src={b.img}
+                  alt={b.name}
+                  title={earned ? `Earned - ${b.need} correct calls` : `Locked - earn ${b.need} correct calls`}
+                  style={s.badgeImg}
+                />
+                <span style={s.badgeTier}>{b.name}</span>
+                <span style={earned ? s.badgeStatusEarned : s.badgeStatusLocked}>
+                  {earned ? 'Earned' : `Locked · ${b.need} correct`}
+                </span>
+                {earned && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenVoucher(b.name)
+                      ensureVoucher(b.name)
+                    }}
+                    style={s.badgeClaim}
+                  >
+                    {vouchers[b.name] ? 'View voucher' : 'Claim voucher'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {openVoucher && vouchers[openVoucher] && (
+          <div style={s.voucher}>
+            <div style={s.voucherHead}>
+              <span style={s.voucherLabel}>ISD MERCH VOUCHER</span>
+              <span style={s.voucherTier}>{openVoucher}</span>
+            </div>
+            <div style={s.voucherItem}>1 × {MERCH[openVoucher].item}</div>
+            <div style={s.voucherCode}>{vouchers[openVoucher].code}</div>
+            <button type="button" onClick={() => copyVoucher(openVoucher)} style={s.voucherCopy}>
+              {copied === openVoucher ? 'Copied' : 'Copy code'}
+            </button>
+            <div style={s.voucherFine}>
+              This voucher is part of a proposed gamification concept for the
+              demo. ISD does not make merch and there is nothing to redeem.
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function PersonaCard({ persona, guess, setGuess, onReveal, loading }) {
+  return (
+    <section style={s.block}>
+      <div style={s.blockLabel}>Persona</div>
+
+      {PERSONA_FIELDS.map(([key, label]) => (
+        <div key={key} style={s.field}>
+          <div style={s.fieldLabel}>{label}</div>
+          <div style={s.fieldText}>{persona[key]}</div>
+        </div>
+      ))}
+
+      <div style={s.rating}>
+        <div style={s.fieldLabel}>
+          How likely would you be to report this person for signs of
+          radicalisation?
+        </div>
+        <div style={s.ratingControl}>
+          <div style={s.ratingRow}>
+            {RATING_OPTIONS.map(({ v, label }) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setGuess(v)}
+                aria-label={`${label} (${v} of 5)`}
+                style={{
+                  ...s.segment,
+                  ...(v === 5 ? { borderRight: 'none' } : {}),
+                  ...(guess !== null && guess >= v ? s.segmentFilled : {}),
+                  ...(guess === v ? s.segmentActive : {}),
+                }}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          <div style={s.ratingLabels}>
+            {RATING_OPTIONS.map(({ v, label }) => (
+              <span
+                key={v}
+                style={{
+                  ...s.ratingLabel,
+                  ...(guess === v ? s.ratingLabelActive : {}),
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onReveal}
+        disabled={guess == null || loading}
+        style={{
+          ...s.primary,
+          ...(guess == null || loading ? s.disabled : {}),
+        }}
+      >
+        {loading ? 'Analysing…' : 'Reveal what the AI sees'}
+      </button>
+    </section>
+  )
+}
+
+function ResultCard({ result, guess, primaryPerf, guideOpen, setGuideOpen, perfOpen, setPerfOpen, onNext }) {
+  return (
+    <section style={s.block}>
+      <div style={s.blockLabel}>Result</div>
+
+      <div style={s.stats}>
+        <div style={s.stat}>
+          <div style={s.statValue}>
+            {RATING_OPTIONS[guess - 1]?.label || guess}
+          </div>
+          <div style={s.statLabel}>Your guess</div>
+        </div>
+        <div style={s.stat}>
+          <div style={s.statValue}>{classShort(result.ground_truth)}</div>
+          <div style={s.statLabel}>Ground-truth class</div>
+        </div>
+        <div style={s.stat}>
+          <div style={s.statValue}>
+            {result.ai.signal}/5
+            {result.ai.flagged ? (
+              <span style={s.flagBadge}> flagged</span>
+            ) : null}
+          </div>
+          <div style={s.statLabel}>AI signal score</div>
+        </div>
+      </div>
+
+      <p style={s.line}>
+        Ground truth: <strong>{classExplain(result.ground_truth)}</strong>
+        {result.ground_truth.injected_factors.length > 0
+          ? ` Injected indicators: ${result.ground_truth.injected_factors.join(', ')}.`
+          : ''}
+      </p>
+
+      <p style={s.calibration}>
+        {calibrationText(guess, result.ground_truth)}
+      </p>
+
+      <h3 style={s.h3}>What the AI detected</h3>
+      <div style={s.factors}>
+        {Object.entries(result.ai.scores || {}).map(([key, val]) => (
+          <div key={key} style={s.factorRow}>
+            <span style={s.factorName}>{FACTOR_LABELS[key] || key}</span>
+            <div style={s.factorTrack}>
+              <div
+                style={{ ...s.factorFill, width: `${(val / 5) * 100}%` }}
+              />
+            </div>
+            <span style={s.factorValue}>{val}/5</span>
+          </div>
+        ))}
+      </div>
+
+      {Object.keys(result.rule_evidence || {}).length > 0 && (
+        <div style={s.evidence}>
+          <div style={s.fieldLabel}>Signals found in the text</div>
+          {Object.entries(result.rule_evidence).map(([factor, phrases]) => (
+            <div key={factor} style={s.evidenceRow}>
+              <span style={s.evidenceFactor}>
+                {FACTOR_LABELS[factor] || factor}
+              </span>
+              <span style={s.evidencePhrases}>
+                "{phrases.join('" · "')}"
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {result.ai.summary && (
+        <p style={s.summary}>{result.ai.summary}</p>
+      )}
+
+      {result.ground_truth.class_label === 'hard_negative' && (
+        <div style={s.callout}>
+          <strong>Hard negative.</strong> This persona expresses ordinary
+          discontent (frustration, cynicism, burnout) with no
+          radicalisation-vulnerability markers. This is the classic
+          over-report case - not every grumbler is at risk.
+        </div>
+      )}
+
+      <div style={s.callout}>{result.note}</div>
+
+      <div style={s.guide}>
+        <button
+          type="button"
+          onClick={() => setGuideOpen((v) => !v)}
+          style={s.guideToggle}
+          aria-expanded={guideOpen}
+        >
+          <span>What are these indicators?</span>
+          <span
+            style={{ ...s.chevron, ...(guideOpen ? s.chevronOpen : {}) }}
+          >
+            ▾
+          </span>
+        </button>
+        {guideOpen && (
+          <div style={s.guideGrid}>
+            {Object.entries(FACTOR_EXPLANATIONS).map(([key, text]) => (
+              <div key={key} style={s.guideItem}>
+                <span style={s.guideItemName}>
+                  <span style={s.guideDot} />
+                  {FACTOR_LABELS[key] || key}
+                </span>
+                <span style={s.guideItemText}>{text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {primaryPerf && (
+        <div style={s.guide}>
+          <button
+            type="button"
+            onClick={() => setPerfOpen((v) => !v)}
+            style={s.guideToggle}
+            aria-expanded={perfOpen}
+          >
+            <span>How accurate is this model?</span>
+            <span
+              style={{ ...s.chevron, ...(perfOpen ? s.chevronOpen : {}) }}
+            >
+              ▾
+            </span>
+          </button>
+          {perfOpen && (
+            <div style={s.perfBody}>
+              <div style={s.perfGrid}>
+                <div style={s.perfStat}>
+                  <div style={s.perfValue}>{pct(primaryPerf.precision)}</div>
+                  <div style={s.perfLabel}>
+                    Precision - of the personas the model flagged, this % truly
+                    carried indicators.
+                  </div>
+                </div>
+                <div style={s.perfStat}>
+                  <div style={s.perfValue}>{pct(primaryPerf.recall)}</div>
+                  <div style={s.perfLabel}>
+                    Recall - of the personas that carried indicators, this % were
+                    caught.
+                  </div>
+                </div>
+                <div style={s.perfStat}>
+                  <div style={s.perfValue}>{pct(primaryPerf.fpRate)}</div>
+                  <div style={s.perfLabel}>
+                    Over-report rate - ordinary discontent that was wrongly
+                    flagged.
+                  </div>
+                </div>
+              </div>
+              <p style={s.perfNote}>
+                Measured on the synthetic labelled set of 1,000 personas.
+                Shown for transparency - these numbers describe the method on
+                synthetic data, not real people.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <button type="button" onClick={onNext} style={s.secondary}>
+        Next persona
+      </button>
+    </section>
+  )
 }
 
 export default function App() {
@@ -329,7 +776,7 @@ export default function App() {
       setCopied(name)
       setTimeout(() => setCopied(null), 1500)
     } catch (e) {
-      /* ignore */
+      console.warn('clipboard write failed:', e)
     }
   }
 
@@ -346,11 +793,7 @@ export default function App() {
       SKIP_KEY,
       SESSION_KEY,
     ]) {
-      try {
-        localStorage.removeItem(k)
-      } catch (e) {
-        /* ignore */
-      }
+      storageRemove(k)
     }
     setStats({ ...EMPTY_STATS })
     setVouchers({})
@@ -389,12 +832,7 @@ export default function App() {
     try {
       const quizPre = loadQuiz(PRE_KEY)
       const quizPost = loadQuiz(POST_KEY)
-      let sid = ''
-      try {
-        sid = localStorage.getItem(SESSION_KEY) || ''
-      } catch (e) {
-        /* ignore */
-      }
+      const sid = storageGet(SESSION_KEY) || ''
       const payload = {
         session_id: sid,
         stats: statsOverride || stats,
@@ -407,7 +845,8 @@ export default function App() {
       }
       await submitSession(payload)
     } catch (e) {
-      /* ignore - non-blocking background upload */
+      // Non-blocking background upload - log and keep the session going.
+      console.warn('session upload failed:', e)
     }
   }
 
@@ -438,201 +877,26 @@ export default function App() {
   const primaryPerf = perf ? perfPrimary(perf) : null
   const isAdmin = hash === '#/admin'
 
-  return (
-    <div>
-      <div style={s.strip} />
-      <header style={s.masthead}>
-        <div style={s.brandRow}>
-          <span style={s.brand}>ISD</span>
-          <span style={s.brandSub}>Internal Security Department</span>
-          <span style={s.badge}>Public-education prototype</span>
-          <button onClick={toggleAdmin} style={isAdmin ? s.adminToggleOn : s.adminToggle}>
-            {isAdmin ? 'View app' : 'Admin'}
-          </button>
-          {!isAdmin && (
-            <button
-              type="button"
-              onClick={() => setToolsOpen((v) => !v)}
-              style={s.toolsToggle}
-              aria-expanded={toolsOpen}
-              aria-controls="tools-panel"
-              title="Tools and session actions"
-              aria-label="Tools and session actions"
-            >
-              <WrenchIcon />
-            </button>
-          )}
-        </div>
-        <h1 style={s.h1}>Spotting the signs of radicalisation</h1>
-        <p className="sub-line" style={s.sub}>
-          Read a synthetic persona. Decide how likely you would be to report it. Then see what the AI detects and why.
-        </p>
-        <div style={s.caveatBox}>
-          <span style={s.caveatIcon} aria-hidden="true">
-            ⓘ
-          </span>
-          <span style={s.caveatText}>
-            Names are synthetic placeholders and may differ between fields.
-            Personas come from the{' '}
-            <a
-              href="https://huggingface.co/datasets/nvidia/Nemotron-Personas-Singapore"
-              target="_blank"
-              rel="noreferrer"
-              style={s.caveatLink}
-            >
-              Nemotron-Personas-Singapore
-            </a>{' '}
-            dataset (CC BY 4.0).
-          </span>
-        </div>
-      </header>
+  let content
+  if (isAdmin) {
+    content = <AdminDashboard />
+  } else if (!started) {
+    content = <PreCheck onDone={handlePreDone} onSkip={handleSkip} />
+  } else {
+    content = (
+      <>
+        <StatsBar stats={stats} />
+        <RewardsCard
+          stats={stats}
+          vouchers={vouchers}
+          openVoucher={openVoucher}
+          setOpenVoucher={setOpenVoucher}
+          ensureVoucher={ensureVoucher}
+          copyVoucher={copyVoucher}
+          copied={copied}
+        />
 
-      {!isAdmin && toolsOpen && (
-        <>
-          <div
-            style={s.sidebarOverlay}
-            onClick={() => setToolsOpen(false)}
-            aria-hidden="true"
-          />
-          <aside id="tools-panel" style={s.sidebar} aria-label="Tools">
-            <div style={s.sidebarHead}>
-              <span style={s.sidebarTitle}>
-                <WrenchIcon /> Tools
-              </span>
-              <button
-                type="button"
-                onClick={() => setToolsOpen(false)}
-                style={s.sidebarClose}
-                title="Close"
-                aria-label="Close tools"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div style={s.sidebarBody}>
-              <button type="button" onClick={() => exportSession(stats, vouchers, 'json')} style={s.exportBtn} title="Download session as JSON">
-                <DownloadIcon /> Export JSON
-              </button>
-              <button type="button" onClick={() => exportSession(stats, vouchers, 'csv')} style={s.exportBtn} title="Download session as CSV">
-                <DownloadIcon /> Export CSV
-              </button>
-              <button type="button" onClick={resetSession} style={s.resetBtn} title="Reset this session">
-                <ResetIcon /> Reset
-              </button>
-              <a href="#/admin" style={s.exportLink} title="Admin dashboard">
-                <ChartIcon /> Admin
-              </a>
-            </div>
-          </aside>
-        </>
-      )}
-
-      {isAdmin ? (
-        <AdminDashboard />
-      ) : (
-        <>
-      {!started ? (
-        <PreCheck onDone={handlePreDone} onSkip={handleSkip} />
-      ) : (
-        <>
-      <div style={s.statsBar}>
-        <div style={s.statsGrid}>
-          <div style={s.statCard}>
-            <div style={s.statNum}>{stats.rated}</div>
-            <div style={s.trackLabel}>Rated</div>
-          </div>
-          <div style={s.statCard}>
-            <div
-              style={{ ...s.statNum, ...(stats.correct > 0 ? s.numAccent : {}) }}
-            >
-              {stats.correct}
-            </div>
-            <div style={s.trackLabel}>Correct</div>
-          </div>
-          <div style={s.statCard}>
-            <div
-              style={{ ...s.statNum, ...(stats.falseAlarm > 0 ? s.numRed : {}) }}
-            >
-              {stats.falseAlarm}
-            </div>
-            <div style={s.trackLabel}>False alarms</div>
-          </div>
-          <div style={s.statCard}>
-            <div style={{ ...s.statNum, ...(stats.miss > 0 ? s.numRed : {}) }}>
-              {stats.miss}
-            </div>
-            <div style={s.trackLabel}>Missed</div>
-          </div>
-          <div
-            style={{ ...s.statCard, ...(stats.streak > 0 ? s.streakCard : {}) }}
-          >
-            <div style={{ ...s.statNum, ...(stats.streak > 0 ? s.streakNum : {}) }}>
-              {stats.streak}
-            </div>
-            <div style={s.trackLabel}>Streak</div>
-          </div>
-        </div>
-      </div>
-
-      <section style={s.rewardsWrap}>
-        <div style={s.rewardsCard}>
-          <div style={s.rewardsTitle}>Unlock rewards</div>
-          <p style={s.rewardsHint}>
-            Correct calls unlock badges. Each badge comes with a proposed ISD
-            merch voucher to claim.
-          </p>
-          <div style={s.badgesRow}>
-            {BADGES.map((b) => {
-              const earned = stats.correct >= b.need
-              return (
-                <div key={b.name} style={s.badgeCell}>
-                  <img
-                    src={b.img}
-                    alt={b.name}
-                    title={earned ? `Earned - ${b.need} correct calls` : `Locked - earn ${b.need} correct calls`}
-                    style={s.badgeImg}
-                  />
-                  <span style={s.badgeTier}>{b.name}</span>
-                  <span style={earned ? s.badgeStatusEarned : s.badgeStatusLocked}>
-                    {earned ? 'Earned' : `Locked · ${b.need} correct`}
-                  </span>
-                  {earned && (
-                    <button
-                      onClick={() => {
-                        setOpenVoucher(b.name)
-                        ensureVoucher(b.name)
-                      }}
-                      style={s.badgeClaim}
-                    >
-                      {vouchers[b.name] ? 'View voucher' : 'Claim voucher'}
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {openVoucher && vouchers[openVoucher] && (
-            <div style={s.voucher}>
-              <div style={s.voucherHead}>
-                <span style={s.voucherLabel}>ISD MERCH VOUCHER</span>
-                <span style={s.voucherTier}>{openVoucher}</span>
-              </div>
-              <div style={s.voucherItem}>1 × {MERCH[openVoucher].item}</div>
-              <div style={s.voucherCode}>{vouchers[openVoucher].code}</div>
-              <button onClick={() => copyVoucher(openVoucher)} style={s.voucherCopy}>
-                {copied === openVoucher ? 'Copied' : 'Copy code'}
-              </button>
-              <div style={s.voucherFine}>
-                This voucher is part of a proposed gamification concept for the
-                demo. ISD does not make merch and there is nothing to redeem.
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <main style={s.main}>
+        <main style={s.main}>
         {error && (
           <div style={s.error}>
             <strong>Error:</strong> {error}
@@ -640,249 +904,61 @@ export default function App() {
         )}
 
         {persona && !result && (
-          <section style={s.block}>
-            <div style={s.blockLabel}>Persona</div>
-
-            {PERSONA_FIELDS.map(([key, label]) => (
-              <div key={key} style={s.field}>
-                <div style={s.fieldLabel}>{label}</div>
-                <div style={s.fieldText}>{persona[key]}</div>
-              </div>
-            ))}
-
-            <div style={s.rating}>
-              <div style={s.fieldLabel}>
-                How likely would you be to report this person for signs of
-                radicalisation?
-              </div>
-              <div style={s.ratingControl}>
-                <div style={s.ratingRow}>
-                  {RATING_OPTIONS.map(({ v, label }) => (
-                    <button
-                      key={v}
-                      onClick={() => setGuess(v)}
-                      aria-label={`${label} (${v} of 5)`}
-                      style={{
-                        ...s.segment,
-                        ...(v === 5 ? { borderRight: 'none' } : {}),
-                        ...(guess !== null && guess >= v ? s.segmentFilled : {}),
-                        ...(guess === v ? s.segmentActive : {}),
-                      }}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-                <div style={s.ratingLabels}>
-                  {RATING_OPTIONS.map(({ v, label }) => (
-                    <span
-                      key={v}
-                      style={{
-                        ...s.ratingLabel,
-                        ...(guess === v ? s.ratingLabelActive : {}),
-                      }}
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={onReveal}
-              disabled={guess == null || loading}
-              style={{
-                ...s.primary,
-                ...(guess == null || loading ? s.disabled : {}),
-              }}
-            >
-              {loading ? 'Analysing…' : 'Reveal what the AI sees'}
-            </button>
-          </section>
+          <PersonaCard
+            persona={persona}
+            guess={guess}
+            setGuess={setGuess}
+            onReveal={onReveal}
+            loading={loading}
+          />
         )}
 
         {result && (
-          <section style={s.block}>
-            <div style={s.blockLabel}>Result</div>
-
-            <div style={s.stats}>
-              <div style={s.stat}>
-                <div style={s.statValue}>
-                  {RATING_OPTIONS[guess - 1]?.label || guess}
-                </div>
-                <div style={s.statLabel}>Your guess</div>
-              </div>
-              <div style={s.stat}>
-                <div style={s.statValue}>{classShort(result.ground_truth)}</div>
-                <div style={s.statLabel}>Ground-truth class</div>
-              </div>
-              <div style={s.stat}>
-                <div style={s.statValue}>
-                  {result.ai.signal}/5
-                  {result.ai.flagged ? (
-                    <span style={s.flagBadge}> flagged</span>
-                  ) : null}
-                </div>
-                <div style={s.statLabel}>AI signal score</div>
-              </div>
-            </div>
-
-            <p style={s.line}>
-              Ground truth: <strong>{classExplain(result.ground_truth)}</strong>
-              {result.ground_truth.injected_factors.length > 0
-                ? ` Injected indicators: ${result.ground_truth.injected_factors.join(', ')}.`
-                : ''}
-            </p>
-
-            <p style={s.calibration}>
-              {calibrationText(guess, result.ground_truth)}
-            </p>
-
-            <h3 style={s.h3}>What the AI detected</h3>
-            <div style={s.factors}>
-              {Object.entries(result.ai.scores || {}).map(([key, val]) => (
-                <div key={key} style={s.factorRow}>
-                  <span style={s.factorName}>{FACTOR_LABELS[key] || key}</span>
-                  <div style={s.factorTrack}>
-                    <div
-                      style={{ ...s.factorFill, width: `${(val / 5) * 100}%` }}
-                    />
-                  </div>
-                  <span style={s.factorValue}>{val}/5</span>
-                </div>
-              ))}
-            </div>
-
-            {Object.keys(result.rule_evidence || {}).length > 0 && (
-              <div style={s.evidence}>
-                <div style={s.fieldLabel}>Signals found in the text</div>
-                {Object.entries(result.rule_evidence).map(([factor, phrases]) => (
-                  <div key={factor} style={s.evidenceRow}>
-                    <span style={s.evidenceFactor}>
-                      {FACTOR_LABELS[factor] || factor}
-                    </span>
-                    <span style={s.evidencePhrases}>
-                      "{phrases.join('" · "')}"
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {result.ai.summary && (
-              <p style={s.summary}>{result.ai.summary}</p>
-            )}
-
-            {result.ground_truth.class_label === 'hard_negative' && (
-              <div style={s.callout}>
-                <strong>Hard negative.</strong> This persona expresses ordinary
-                discontent (frustration, cynicism, burnout) with no
-                radicalisation-vulnerability markers. This is the classic
-                over-report case - not every grumbler is at risk.
-              </div>
-            )}
-
-            <div style={s.callout}>{result.note}</div>
-
-            <div style={s.guide}>
-              <button
-                onClick={() => setGuideOpen((v) => !v)}
-                style={s.guideToggle}
-                aria-expanded={guideOpen}
-              >
-                <span>What are these indicators?</span>
-                <span
-                  style={{ ...s.chevron, ...(guideOpen ? s.chevronOpen : {}) }}
-                >
-                  ▾
-                </span>
-              </button>
-              {guideOpen && (
-                <div style={s.guideGrid}>
-                  {Object.entries(FACTOR_EXPLANATIONS).map(([key, text]) => (
-                    <div key={key} style={s.guideItem}>
-                      <span style={s.guideItemName}>
-                        <span style={s.guideDot} />
-                        {FACTOR_LABELS[key] || key}
-                      </span>
-                      <span style={s.guideItemText}>{text}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {primaryPerf && (
-              <div style={s.guide}>
-                <button
-                  onClick={() => setPerfOpen((v) => !v)}
-                  style={s.guideToggle}
-                  aria-expanded={perfOpen}
-                >
-                  <span>How accurate is this model?</span>
-                  <span
-                    style={{ ...s.chevron, ...(perfOpen ? s.chevronOpen : {}) }}
-                  >
-                    ▾
-                  </span>
-                </button>
-                {perfOpen && (
-                  <div style={s.perfBody}>
-                    <div style={s.perfGrid}>
-                      <div style={s.perfStat}>
-                        <div style={s.perfValue}>{pct(primaryPerf.precision)}</div>
-                        <div style={s.perfLabel}>
-                          Precision - of the personas the model flagged, this % truly
-                          carried indicators.
-                        </div>
-                      </div>
-                      <div style={s.perfStat}>
-                        <div style={s.perfValue}>{pct(primaryPerf.recall)}</div>
-                        <div style={s.perfLabel}>
-                          Recall - of the personas that carried indicators, this % were
-                          caught.
-                        </div>
-                      </div>
-                      <div style={s.perfStat}>
-                        <div style={s.perfValue}>{pct(primaryPerf.fpRate)}</div>
-                        <div style={s.perfLabel}>
-                          Over-report rate - ordinary discontent that was wrongly
-                          flagged.
-                        </div>
-                      </div>
-                    </div>
-                    <p style={s.perfNote}>
-                      Measured on the synthetic labelled set of 1,000 personas.
-                      Shown for transparency - these numbers describe the method on
-                      synthetic data, not real people.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <button onClick={loadPersona} style={s.secondary}>
-              Next persona
-            </button>
-          </section>
+          <ResultCard
+            result={result}
+            guess={guess}
+            primaryPerf={primaryPerf}
+            guideOpen={guideOpen}
+            setGuideOpen={setGuideOpen}
+            perfOpen={perfOpen}
+            setPerfOpen={setPerfOpen}
+            onNext={loadPersona}
+          />
         )}
 
         {loading && !persona && <p style={s.muted}>Loading…</p>}
-      </main>
+        </main>
 
-      <LearningCheck
-        key={resetCount}
-        stats={stats}
-        pre={quizPre}
-        post={quizPost}
-        onPre={handlePreDone}
-        onPost={handlePostDone}
+        <LearningCheck
+          key={resetCount}
+          stats={stats}
+          pre={quizPre}
+          post={quizPost}
+          onPre={handlePreDone}
+          onPost={handlePostDone}
+        />
+      </>
+    )
+  }
+
+  return (
+    <div>
+      <div style={s.strip} />
+      <Masthead
+        isAdmin={isAdmin}
+        onToggleAdmin={toggleAdmin}
+        toolsOpen={toolsOpen}
+        setToolsOpen={setToolsOpen}
       />
-        </>
+      {!isAdmin && toolsOpen && (
+        <ToolsSidebar
+          onClose={() => setToolsOpen(false)}
+          onExportJson={() => exportSession(stats, vouchers, 'json')}
+          onExportCsv={() => exportSession(stats, vouchers, 'csv')}
+          onReset={resetSession}
+        />
       )}
-        </>
-      )}
+      {content}
 
       <footer style={s.footer}>
         Educational tool. All personas are synthetic; results are not a diagnosis

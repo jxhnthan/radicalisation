@@ -94,11 +94,11 @@ export default function AdminDashboard() {
         {summary && tab === 'sessions' && (
           <>
             <div style={s.actions}>
-              <button onClick={simulate} disabled={busy} style={s.primary}>
+              <button type="button" onClick={simulate} disabled={busy} style={s.primary}>
                 {busy ? 'Working…' : 'Simulate sample data'}
               </button>
               {summary.simulated > 0 && (
-                <button onClick={clearSim} disabled={busy} style={s.secondary}>
+                <button type="button" onClick={clearSim} disabled={busy} style={s.secondary}>
                   Clear sample data ({summary.simulated})
                 </button>
               )}
@@ -132,7 +132,7 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {perf && perf.available && tab === 'perf' && (
+        {perf?.available && tab === 'perf' && (
           <>
             <PerfSection perf={perf} />
             <p style={s.fine}>
@@ -155,16 +155,16 @@ function Stat({ val, lab }) {
   )
 }
 
+function verdictText(quiz) {
+  if (quiz.significant && quiz.direction === 'improvement') return 'Significant improvement'
+  if (quiz.significant && quiz.direction === 'decline') return 'Significant decline'
+  if (quiz.direction === 'no change') return 'No measurable change'
+  return 'Change not statistically significant'
+}
+
 function QuizSection({ quiz }) {
   const delta = quiz.mean_diff
-  const verdict =
-    quiz.significant && quiz.direction === 'improvement'
-      ? 'Significant improvement'
-      : quiz.significant && quiz.direction === 'decline'
-      ? 'Significant decline'
-      : quiz.direction === 'no change'
-      ? 'No measurable change'
-      : 'Change not statistically significant'
+  const verdict = verdictText(quiz)
   const tone = quiz.significant ? s.badgetUp : s.badgetFlat
 
   return (
@@ -283,7 +283,7 @@ function PairedChart({ pairs }) {
         </g>
       ))}
       {pairs.map(([pre, post], i) => (
-        <g key={i}>
+        <g key={`${pre}-${post}-${i}`}>
           <line
             x1={x(i)}
             x2={x(i)}
@@ -306,13 +306,14 @@ function PairedChart({ pairs }) {
 function Tip({ text, children }) {
   const [open, setOpen] = useState(false)
   return (
-    <span
+    <button
+      type="button"
       style={s.tip}
-      tabIndex={0}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
       onFocus={() => setOpen(true)}
       onBlur={() => setOpen(false)}
+      aria-label={text}
     >
       {children || (
         <span style={s.tipIcon} aria-hidden="true">
@@ -324,7 +325,7 @@ function Tip({ text, children }) {
           {text}
         </span>
       )}
-    </span>
+    </button>
   )
 }
 
@@ -338,7 +339,7 @@ function dec(x) {
 }
 
 function PerfSection({ perf }) {
-  if (!perf || !perf.available) return null
+  if (!perf?.available) return null
   const hn = perf.hard_negative_fp_rate || {}
   const agree = perf.agreement || {}
   const models = [
@@ -629,7 +630,17 @@ const s = {
   err: { color: 'var(--red)', fontSize: 13 },
   badgetUp: { color: 'var(--accent)', fontWeight: 700 },
   badgetFlat: { color: 'var(--text-muted)', fontWeight: 600 },
-  tip: { position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'help' },
+  tip: {
+    position: 'relative',
+    display: 'inline-flex',
+    alignItems: 'center',
+    cursor: 'help',
+    border: 'none',
+    background: 'none',
+    padding: 0,
+    font: 'inherit',
+    color: 'inherit',
+  },
   tipIcon: {
     width: 15,
     height: 15,

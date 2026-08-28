@@ -1,9 +1,5 @@
-"""Rule-based indicator scoring (interpretable baseline, no LLM).
-
-Scores each persona against keyword/phrase lexicons per CVE indicator. This is
-the fast, transparent baseline that the LLM judge is compared against in the
-evaluation. It is intentionally simple and auditable.
-"""
+# Rule-based indicator scorer - the transparent, auditable baseline that the
+# LLM judge is compared against in the evaluation.
 from __future__ import annotations
 
 import re
@@ -86,7 +82,7 @@ def _norm(text: str) -> str:
 
 
 def score_persona(text_fields: dict[str, str]) -> dict:
-    """Return per-factor scores (0-5), signal (0-5) and flagged for a persona."""
+    # Per-factor scores (0-5), overall signal (0-5) and flag (signal >= 3).
     text = " ".join(_norm(text_fields.get(f, "")) for f in TEXT_FIELDS)
     scores: dict[str, int] = {}
     for factor, phrases in FACTOR_LEXICON.items():
@@ -97,7 +93,7 @@ def score_persona(text_fields: dict[str, str]) -> dict:
 
 
 def evidence(text_fields: dict[str, str]) -> dict[str, list[str]]:
-    """Return the exact lexicon phrases matched per factor (for explainability)."""
+    # Exact lexicon phrases matched per factor (for the app's explainability).
     text = " ".join(_norm(text_fields.get(f, "")) for f in TEXT_FIELDS)
     out: dict[str, list[str]] = {}
     for factor, phrases in FACTOR_LEXICON.items():

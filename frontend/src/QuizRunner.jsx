@@ -84,6 +84,7 @@ export default function QuizRunner({ onFinish }) {
           return (
             <button
               key={o.v}
+              type="button"
               onClick={() => choose(o.v)}
               style={{ ...s.opt, ...(on ? s.optOn : {}) }}
               aria-pressed={on}
@@ -100,12 +101,13 @@ export default function QuizRunner({ onFinish }) {
 
       <div style={s.nav}>
         <button
+          type="button"
           onClick={() => setIdx((i) => Math.max(0, i - 1))}
           style={{ ...s.btn, ...(idx === 0 ? s.btnHidden : {}) }}
         >
           Back
         </button>
-        <button onClick={advance} disabled={!answered} style={{ ...s.btnPrimary, ...(!answered ? s.btnDisabled : {}) }}>
+        <button type="button" onClick={advance} disabled={!answered} style={{ ...s.btnPrimary, ...(!answered ? s.btnDisabled : {}) }}>
           {isLast ? 'Finish' : 'Next'}
         </button>
       </div>

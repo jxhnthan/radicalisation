@@ -1,14 +1,5 @@
-"""Data loader for the radicalisation prototype.
-
-Uses the Hugging Face **datasets-server HTTP API** (lightweight, on-demand) instead
-of downloading the full 278 MB dataset, and caches what we fetch into a growable
-local parquet cache.
-
-API reference: https://huggingface.co/docs/datasets-server
-Endpoints used:
-  GET /statistics  -> total row count, per-column summary stats
-  GET /rows        -> paginated rows (max `length` = 100)
-"""
+# Loads personas via the Hugging Face datasets-server HTTP API into a growable
+# local parquet cache - lightweight and on-demand, no bulk download.
 from __future__ import annotations
 
 import json
@@ -28,7 +19,8 @@ API_BASE = "https://datasets-server.huggingface.co"
 DATASET = "nvidia/Nemotron-Personas-Singapore"
 CONFIG = "default"
 SPLIT = "train"
-PAGE_SIZE = 100  # datasets-server maximum per request
+# datasets-server caps each request at 100 rows.
+PAGE_SIZE = 100
 
 # Local growable parquet cache (rows are appended to this file)
 CACHE_PATH = DATA_DIR / "personas_cache.parquet"
@@ -58,14 +50,15 @@ DEMOGRAPHIC_COLUMNS = [
 ]
 LIST_COLUMNS = ["skills_and_expertise_list", "hobbies_and_interests_list"]
 
-DEFAULT_SAMPLE_ROWS = 10_000  # sensible default for a slow start
+# Sensible default for a slow start.
+DEFAULT_SAMPLE_ROWS = 10_000
 
 
 # --------------------------------------------------------------------------- #
 # Low-level API access
 # --------------------------------------------------------------------------- #
 def _get_json(url: str, retries: int = 4, backoff: float = 2.0) -> dict:
-    """GET a JSON endpoint with a small retry/backoff for transient 429/5xx."""
+    # Small retry/backoff for transient 429/5xx responses.
     last_err: Optional[Exception] = None
     for attempt in range(retries):
         try:
@@ -90,21 +83,18 @@ def _rows_url(offset: int, length: int) -> str:
 
 
 def get_num_rows() -> int:
-    """Total number of rows in the dataset (from /statistics)."""
     url = f"{API_BASE}/statistics?dataset={urllib.parse.quote(DATASET, safe='')}&config={CONFIG}&split={SPLIT}"
     data = _get_json(url)
     return int(data["num_examples"])
 
 
 def fetch_rows(offset: int, length: int = PAGE_SIZE) -> tuple[list[dict], int]:
-    """Fetch one page of rows. Returns (row_dicts, num_rows_total)."""
     data = _get_json(_rows_url(offset, min(length, PAGE_SIZE)))
     rows = [item["row"] for item in data["rows"]]
     return rows, int(data["num_rows_total"])
 
 
 def stream_rows(start_offset: int = 0, max_rows: Optional[int] = None) -> Iterator[dict]:
-    """Iterate over row dicts starting at `start_offset`, up to `max_rows`."""
     num_rows_total = get_num_rows()
     end = num_rows_total if max_rows is None else min(start_offset + max_rows, num_rows_total)
     offset = start_offset
@@ -128,15 +118,8 @@ def cached_count() -> int:
 
 
 def load_data(n_rows: Optional[int] = None, force_refresh: bool = False) -> pd.DataFrame:
-    """Return a DataFrame of (at least) the first `n_rows` personas.
-
-    Fetches missing rows through the API and appends them to the local parquet
-    cache, so repeated calls are cheap and the cache grows over time.
-
-    Args:
-        n_rows: how many rows to guarantee. None -> DEFAULT_SAMPLE_ROWS.
-        force_refresh: ignore the cache and refetch from scratch.
-    """
+    # Return at least n_rows personas, fetching missing rows through the API and
+    # appending them to the local parquet cache (repeated calls stay cheap).
     n_rows = DEFAULT_SAMPLE_ROWS if n_rows is None else n_rows
     num_rows_total = get_num_rows()
 
@@ -167,5 +150,4 @@ def load_data(n_rows: Optional[int] = None, force_refresh: bool = False) -> pd.D
 # Convenience
 # --------------------------------------------------------------------------- #
 def sample_personas(n: int = 5) -> pd.DataFrame:
-    """Small convenience for quick looks."""
     return load_data(n_rows=n)
