@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { fetchPersona, fetchPerformance, revealPersona, submitSession, SESSION_KEY } from './api.js'
 import AdminDashboard from './AdminDashboard.jsx'
 import { DownloadIcon, ResetIcon, ChartIcon, WrenchIcon, CloseIcon } from './icons.jsx'
+import Landing from './Landing.jsx'
 import LearningCheck from './LearningCheck.jsx'
 import PreCheck from './PreCheck.jsx'
 import { loadQuiz, normalizeQuiz, saveQuiz, scoreQuiz, POST_KEY, PRE_KEY, SKIP_KEY } from './quiz.js'
@@ -67,6 +68,7 @@ const BADGES = [
 ]
 
 const STORAGE_KEY = 'radicalisation-aw-stats'
+const WELCOME_KEY = 'radicalisation-aw-welcome'
 const EMPTY_STATS = { rated: 0, correct: 0, falseAlarm: 0, miss: 0, streak: 0, bestStreak: 0 }
 
 const VOUCHER_KEY = 'radicalisation-aw-vouchers'
@@ -710,6 +712,8 @@ export default function App() {
   const [started, setStarted] = useState(
     () => normalizeQuiz(loadQuiz(PRE_KEY)) != null
   )
+  // First-visit landing page shows once; returning users go straight in.
+  const [welcome, setWelcome] = useState(() => storageGet(WELCOME_KEY) !== '1')
   const [hash, setHash] = useState(() => window.location.hash)
   const [toolsOpen, setToolsOpen] = useState(false)
   const prevEarned = useRef([])
@@ -792,6 +796,7 @@ export default function App() {
       POST_KEY,
       SKIP_KEY,
       SESSION_KEY,
+      WELCOME_KEY,
     ]) {
       storageRemove(k)
     }
@@ -804,6 +809,7 @@ export default function App() {
     setQuizPre(null)
     setQuizPost(null)
     setStarted(false)
+    setWelcome(true)
     setResetCount((n) => n + 1)
     loadPersona()
   }
@@ -816,6 +822,11 @@ export default function App() {
 
   function handleSkip() {
     setStarted(true)
+  }
+
+  function handleBegin() {
+    setWelcome(false)
+    storageSet(WELCOME_KEY, '1')
   }
 
   function toggleAdmin() {
@@ -876,10 +887,13 @@ export default function App() {
 
   const primaryPerf = perf ? perfPrimary(perf) : null
   const isAdmin = hash === '#/admin'
+  const showLanding = welcome && !started && !isAdmin
 
   let content
   if (isAdmin) {
     content = <AdminDashboard />
+  } else if (showLanding) {
+    content = <Landing onBegin={handleBegin} />
   } else if (!started) {
     content = <PreCheck onDone={handlePreDone} onSkip={handleSkip} />
   } else {
@@ -944,12 +958,14 @@ export default function App() {
   return (
     <div>
       <div style={s.strip} />
-      <Masthead
-        isAdmin={isAdmin}
-        onToggleAdmin={toggleAdmin}
-        toolsOpen={toolsOpen}
-        setToolsOpen={setToolsOpen}
-      />
+      {!showLanding && (
+        <Masthead
+          isAdmin={isAdmin}
+          onToggleAdmin={toggleAdmin}
+          toolsOpen={toolsOpen}
+          setToolsOpen={setToolsOpen}
+        />
+      )}
       {!isAdmin && toolsOpen && (
         <ToolsSidebar
           onClose={() => setToolsOpen(false)}

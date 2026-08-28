@@ -233,23 +233,70 @@ cp .env.example .env
 `data/analyses.json` (app pool + judge analyses). Then run the app as in
 Quickstart.
 
-### Run with Docker (no local installs needed)
+### Run with Docker (recommended for the assessor)
 
-The precomputed data (app pool + judge analyses) is baked into the backend
-image, so the demo runs fully offline; Ollama is only a fallback for uncached
-personas.
+The fastest way to run the full app on a fresh machine - no Python, Node or
+Ollama installs required. The precomputed data (app pool + judge analyses) is
+baked into the backend image, so the demo runs fully offline; Ollama is only a
+fallback for uncached personas and is NOT needed for the demo.
+
+**Prerequisites.** Docker Desktop (macOS/Windows) or Docker Engine + Compose v2
+(Linux). Confirm with:
 
 ```bash
-docker compose up --build     # first build takes a few minutes
-# app:   http://localhost:8080
-# api:   http://localhost:8000
-
-# smoke test
-curl http://localhost:8000/api/health        # {"status":"ok"}
-curl http://localhost:8000/api/performance   # measured metrics
+docker --version
+docker compose version
 ```
 
-Verification status: the backend image was validated by installing
+**Run it.**
+
+```bash
+# From the project root (the folder containing docker-compose.yml):
+docker compose up --build     # first build takes a few minutes
+
+# App:   http://localhost:8080
+# API:   http://localhost:8000
+```
+
+The first build pulls base images and compiles the frontend; later runs can use
+`docker compose up` and are much faster.
+
+**Smoke test** (in a second terminal):
+
+```bash
+curl http://localhost:8000/api/health                              # {"status":"ok"}
+curl http://localhost:8000/api/performance                         # measured metrics
+curl "http://localhost:8000/api/persona?session=demo"              # a JSON persona
+```
+
+**Manual check.** At http://localhost:8080 you should see the landing page, then
+be able to load a persona and get an instant "reveal" (offline, no LLM needed).
+The admin dashboard is at http://localhost:8080/#/admin - use its "Simulate"
+button to seed sample data and see a populated report.
+
+**Stop / clean up.**
+
+```bash
+docker compose down        # stop the containers
+docker compose down -v     # also remove named volumes, if any
+```
+
+**Troubleshooting.**
+
+- `docker: command not found` - install Docker Desktop (or Docker Engine) and reopen your terminal.
+- `Cannot connect to the Docker daemon` - start Docker Desktop first, then run `docker compose up --build`.
+- Ports 8080 or 8000 already in use - edit the `ports:` mapping in `docker-compose.yml` (e.g. `"9090:80"` for the frontend) and open the app on the new port; the frontend proxies `/api` to the backend container, so only the frontend port needs to change.
+- `ERROR: Cannot locate specified Dockerfile` - you must run `docker compose` from the project root.
+- The precomputed `data/` files are required by the build and are committed to the repo - keep them (do not delete or gitignore them).
+- Ollama is not required for this path; it is only used as a fallback for uncached personas, or by the optional "Full reproduction" below.
+- This repo uses the Compose v2 command `docker compose`, not the legacy `docker-compose`.
+
+**Note on the admin dashboard.** Session rows are stored inside the backend
+container (`/app/data/admin/sessions.jsonl`) and reset when the container is
+recreated; there is no persistent volume by design. Use the "Simulate" button to
+re-seed sample data.
+
+**Verification status.** The backend image was validated by installing
 `backend/requirements.txt` into a clean environment and booting the same
 endpoints (health / performance / persona / reveal all return 200); the
 frontend build stage was validated with `npm run build`. The full

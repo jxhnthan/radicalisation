@@ -74,3 +74,242 @@ p {
 button {
   font-family: inherit;
 }
+
+/* ---------------------------------------------------------------------------
+   Landing page (front door shown before the tool starts)
+--------------------------------------------------------------------------- */
+.landing {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 20px 48px;
+  animation: landingFade 0.45s ease-out both;
+}
+
+.landing-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+
+.landing-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.landing-brand-mark {
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.landing-brand-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.landing-tag {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 0 12px;
+}
+
+.landing-hero {
+  text-align: center;
+  padding: 72px 24px 56px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    radial-gradient(900px 320px at 15% -20%, rgba(11, 91, 156, 0.07), transparent 60%),
+    radial-gradient(700px 280px at 90% 0%, rgba(193, 14, 31, 0.05), transparent 55%),
+    linear-gradient(180deg, #f7fafc, #ffffff);
+}
+
+.landing-kicker {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+.landing-title {
+  margin: 0 auto 16px;
+  max-width: 560px;
+  font-size: clamp(30px, 5vw, 42px);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.landing-lead {
+  margin: 0 auto 32px;
+  max-width: 460px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.landing-cta {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.landing-cta:hover {
+  background: var(--accent-strong);
+}
+
+.landing-meta {
+  margin: 16px 0 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.landing-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 40px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.landing-step {
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.landing-step + .landing-step {
+  border-left: 1px solid var(--border);
+}
+
+.landing-step-num {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.landing-step-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.landing-step-text {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.landing-note {
+  margin: 20px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.landing-signs {
+  margin-top: 40px;
+}
+
+.landing-signs-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+.landing-signs-note {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.landing-sign-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.landing-sign {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-sign-img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+}
+
+.landing-sign-label {
+  padding: 10px 12px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+  .landing-sign-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .landing-sign-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes landingFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .landing-hero {
+    padding: 48px 20px 40px;
+  }
+  .landing-steps {
+    grid-template-columns: 1fr;
+  }
+  .landing-step + .landing-step {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+  .landing-step {
+    text-align: left;
+    padding: 18px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing {
+    animation: none;
+  }
+}
