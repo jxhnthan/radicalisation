@@ -17,7 +17,7 @@ An AI prototype that evaluates whether LLM-based methods can surface radicalisat
 - [9. Development process](#9-development-process)
 - [10. Limitations](#10-limitations)
 - [11. Use of AI coding agents](#11-use-of-ai-coding-agents)
-- [12. Layout](#13-layout)
+- [12. Layout](#12-layout)
 
 ---
 
@@ -74,9 +74,9 @@ This project is designed as a public education tool for the **Singaporean public
 
 - End users: Members of the Singapore public. The prototype uses a guess-then-reveal format: users read a synthetic persona and indicate how likely they would be to report the individual to ISD. They then see the AI’s assessment and an explanation of the indicators it identified.
 
-- The interface assumes no specialist knowledge. It uses plain language, explains indicators in non-technical terms, and makes clear that the AI’s assessment is not a diagnosis or definitive determination of radicalisation.
+- The platform assumes no specialised knowledge. It uses plain language, explains indicators in non-technical terms, and explicitly states that the AI’s assessment is not a diagnosis or definitive determination of radicalisation.
 
-- The goal is awareness and better-informed judgement: helping users distinguish ordinary expressions of dissatisfaction from potential vulnerability indicators, while highlighting the risks of both under-reporting and over-reporting.
+- The goal is to increase awareness and better-informed judgement in helping users distinguish ordinary expressions of dissatisfaction from potential vulnerability indicators, while highlighting the risks of both under-reporting and over-reporting.
 
 ---
 
@@ -113,9 +113,9 @@ The source dataset contains synthetic persona descriptions, not observations of 
 Instead, we test a narrower question:
 - Can AI detect specific psychosocial indicators associated with radicalisation vulnerability when they appear in text?
 
-We inject these indicators into a controlled subset of synthetic personas, giving us known ground-truth labels without using real personal data.
+We inject these indicators into a controlled subset of synthetic personas, giving us known ground-truth labels without using any real personal data.
 
-The evaluation is therefore indicator-level, not person-level. Detecting an indicator does not mean that a person is radicalised or poses a threat. It only tests whether the AI can identify a predefined textual signal under controlled conditions
+Hence, our evaluation is limited to that at an indicator-level and not person-level. Detecting an indicator does not mean that a person is radicalised or poses a threat for society. It only tests whether the AI can identify a predefined textual signal under controlled conditions.
 
 ## 3. AI integration
  
@@ -153,49 +153,21 @@ The 7B model was chosen over larger/cloud models for speed on the target machine
 
 ## 5. Evaluation methodology
 
-The evaluation combines a benchmark against synthetic ground truth with a cross-method comparison between a deterministic rule-based detector and an LLM-as-judge. Performance is assessed both overall and across the four cohorts, with particular attention to false positives on hard negatives.
+The evaluation benchmarks detection against synthetic ground truth and cross-checks a rule-based detector against an LLM-as-judge, reporting performance overall, by cohort, and on hard negatives.
 
-**(5.1) Why synthetic ground truth?**
-Reliable labelled data on radicalisation is extremely difficult to obtain ethically. Real-world datasets may contain sensitive personal information, while establishing whether an individual is genuinely “radicalised” is itself a difficult and consequential labelling task. 
+**Why synthetic ground truth and not human evaluation?**
+Reliable radicalisation-labelled data is hard to obtain ethically, and there is no objective label a human rater could apply to judge whether a synthetic persona is "radicalised." Instead, our labels are known by construction: indicators are deliberately injected into personas under controlled conditions, making the experiment reproducible and auditable. Person-level human judgement is reserved for the public-education component, not model evaluation.
 
-In contrast, our labels are known by construction: the target indicators are deliberately injected into synthetic personas under controlled conditions. This makes the experiment reproducible, auditable, and suitable for testing the detection methodology.
+**Why both a rule-based detector and an LLM judge?**
+The rule-based detector gives a transparent, inspectable baseline. The LLM-as-judge tests whether semantic reasoning catches indicators simple rules miss. Since the same LLM family generates the synthetic examples, LLM-judge results are treated as a comparison point rather than ground truth; agreement with the independent rule-based detector guards against relying solely on the generating model.
 
-**(5.2) Why not human evaluation?**
-Human evaluation would not solve the underlying ground-truth problem. There is no objective label against which human raters could reliably classify these synthetic personas as “radicalised.”
+**Evaluation design**
+Three questions drive the design: (1) can the detector catch injected indicators, (2) does it hold up when indicators are subtle or partial, and (3) does it avoid over-flagging personas that merely sound discontented?
 
-More importantly, asking people to make person-level radicalisation judgements would conflict with the project's focus on avoiding misidentification. 
-
-Human assessment is therefore used for the public-education component, rather than as the ground truth for model evaluation.
-
-**(5.3) Why a rule-based baseline and an LLM judge?**
-The rule-based detector provides a transparent and deterministic baseline whose decisions can be directly inspected. The LLM-as-judge then tests whether semantic reasoning can identify indicators that simple rules may miss. Because the LLM is also involved in generating the synthetic examples, the LLM-based results are treated as a comparison rather than as authoritative ground truth. Agreement with the independent rule-based approach provides an additional check against relying solely on the generating model.
-
-**(5.4) Evaluation design**
-
-The evaluation is designed to answer three questions:
-
-1. Can the detector identify personas containing the injected indicators?
-2. Does it still work when indicators are subtle or incomplete?
-3. Does it avoid over-flagging personas that appear concerning but do not contain the target indicators?
-
-**Primary evaluation**
-The primary task is binary detection against the synthetic ground truth:
-- Positive: 200 personas containing full or partial indicators
-- Negative: 800 personas comprising baseline and hard-negative cases
-
-We report precision, recall, and the full confusion matrix at a pre-specified operating threshold, rather than relying on a single aggregate score.
-
-**Cohort-level evaluation:**
-Overall performance can hide weaknesses on less obvious cases. We therefore report recall separately for the full-indicator and partial-indicator cohorts.
-
-This tests whether the detector can identify weaker or incomplete signals, rather than succeeding only when multiple indicators are clearly present.
-
-**Hard-negative evaluation:**
-We separately measure the false-positive rate on the 100 hard-negative personas.
-Hard negatives are designed to contain potentially concerning language without the target psychosocial indicators. This provides a focused test of over-flagging, which is particularly important in a public-facing CVE education context.
-
-**Secondary comparison:**
-We compare the rule-based detection pipeline with an LLM-as-judge approach. Agreement is measured using Cohen's κ (kappa) rather than raw percentage agreement, as kappa accounts for agreement that could occur by chance under class imbalance.
+- **Primary:** binary detection against ground truth — 200 positives (full + partial indicators) vs. 800 negatives (baseline + hard negatives). We report precision, recall, and the confusion matrix at a pre-specified threshold, not a single aggregate score.
+- **Cohort-level:** recall is reported separately for full and partial-indicator personas, since overall performance can mask weak detection of subtler signals.
+- **Hard-negative:** false-positive rate is measured on the 100 hard negatives specifically, since over-flagging ordinary discontent is a key risk in a public-facing CVE context.
+- **Secondary:** rule-based vs. LLM-judge agreement, measured with Cohen's κ rather than raw agreement, since κ corrects for chance agreement under class imbalance.
 
 ## 6. How to run
 
@@ -369,6 +341,7 @@ WIP
 radicalisation/
 ├── README.md                    # primary artifact (this file)
 ├── requirements.txt             # data-pipeline deps
+├── LICENSE
 ├── docker-compose.yml           # app + API containers
 ├── .gitignore / .dockerignore / .env.example
 ├── prompts/
@@ -384,12 +357,15 @@ radicalisation/
 │   ├── app_pool.csv             # personas served by the app
 │   ├── analyses.json            # precomputed LLM-judge results
 │   ├── evaluation_results.json  # detector metrics
+│   ├── injection_log.jsonl      # audit log of LLM rewrites
 │   └── admin/sessions.jsonl     # auto-submitted sessions (anonymized)
 ├── backend/
 │   ├── app.py                   # FastAPI app
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
+│   ├── index.html
+│   ├── vite.config.js           # dev server + /api proxy
 │   ├── public/badges/           # reward badge images
 │   ├── src/
 │   │   ├── App.jsx              # main React UI
@@ -398,18 +374,20 @@ radicalisation/
 │   │   ├── LearningCheck.jsx    # post-check + comparison
 │   │   ├── QuizRunner.jsx       # 1-at-a-time quiz widget
 │   │   ├── quiz.js              # scenarios + scoring
-│   │   ├── api.js / index.css / main.jsx
-│   │   └── ...
+│   │   ├── icons.jsx            # inline SVG icons
+│   │   └── api.js / index.css / main.jsx
 │   ├── Dockerfile / nginx.conf
-│   └── package.json
+│   └── package.json / package-lock.json
 ├── tests/
 │   ├── test_backend.py
 │   └── test_inject.py
 └── src/
+    ├── build_labelled_set.py    # 4-class labelled set (LLM rewrites)
     ├── data_loader.py           # datasets-server API loader
     ├── llm_client.py            # OpenAI-compatible client (Ollama / any endpoint)
     ├── inject_indicators.py     # selection + LLM rewriting -> labelled set
     ├── precompute_judgements.py # precompute LLM-judge analyses
+    ├── rebuild_app_pool.py      # app pool + incremental judge analyses
     ├── scoring.py               # rule-based indicator scorer
     └── evaluate.py              # precision/recall/agreement on the labelled set
 ```
