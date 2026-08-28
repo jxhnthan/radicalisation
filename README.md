@@ -72,11 +72,11 @@ detection -> precision/recall + hard-negative false-positive rate
 
 This project is designed as a public education tool for the **Singaporean public.**
 
-End users: Members of the Singapore public. The prototype uses a guess-then-reveal format: users read a synthetic persona and indicate how likely they would be to report the individual to ISD. They then see the AI’s assessment and an explanation of the indicators it identified.
+- End users: Members of the Singapore public. The prototype uses a guess-then-reveal format: users read a synthetic persona and indicate how likely they would be to report the individual to ISD. They then see the AI’s assessment and an explanation of the indicators it identified.
 
-The interface assumes no specialist knowledge. It uses plain language, explains indicators in non-technical terms, and makes clear that the AI’s assessment is not a diagnosis or definitive determination of radicalisation.
+- The interface assumes no specialist knowledge. It uses plain language, explains indicators in non-technical terms, and makes clear that the AI’s assessment is not a diagnosis or definitive determination of radicalisation.
 
-The goal is awareness and better-informed judgement: helping users distinguish ordinary expressions of dissatisfaction from potential vulnerability indicators, while highlighting the risks of both under-reporting and over-reporting.
+- The goal is awareness and better-informed judgement: helping users distinguish ordinary expressions of dissatisfaction from potential vulnerability indicators, while highlighting the risks of both under-reporting and over-reporting.
 
 ---
 
@@ -84,15 +84,15 @@ The goal is awareness and better-informed judgement: helping users distinguish o
 
 How can we develop and evaluate AI-assisted detection of potential radicalisation risk factors when real-world labelled data is difficult to obtain ethically?
 
-Research on radicalisation and countering violent extremism (CVE) often relies on behavioural data such as social media posts, private messages, and social interaction histories. However, this data is difficult to access responsibly: it may contain highly sensitive personal information, meaningful consent is often impractical, and false identification can have serious consequences. 
+- Research on radicalisation and countering violent extremism (CVE) often relies on behavioural data such as social media posts, private messages, and social interaction histories. However, this data is difficult to access responsibly: it may contain highly sensitive personal information, meaningful consent is often impractical, and false identification can have serious consequences. 
 
-This creates a fundamental challenge for developing and validating AI-based detection methods: reliable, labelled ground-truth data is extremely limited.
+- This creates a fundamental challenge for developing and validating AI-based detection methods: reliable, labelled ground-truth data is extremely limited.
 
-The prototype focuses on indicators such as **grievance, us-versus-them framing, identity-seeking, social isolation, institutional distrust, and moral outrage.**
+- The prototype focuses on indicators such as **grievance, us-versus-them framing, identity-seeking, social isolation, institutional distrust, and moral outrage.**
 
-To investigate this without using real individuals or personal data, we construct a synthetic labelled dataset using NVIDIA's Nemotron-Personas-Singapore dataset. The dataset contains synthetic personas grounded in Singapore census demographics rather than real individuals. A local LLM rewrites a subset of persona texts to introduce the target risk-factor patterns, while the remaining personas are left unchanged as negative examples.
+- To investigate this without using real individuals or personal data, we construct a synthetic labelled dataset using NVIDIA's Nemotron-Personas-Singapore dataset. The dataset contains synthetic personas grounded in Singapore census demographics rather than real individuals. A local LLM rewrites a subset of persona texts to introduce the target risk-factor patterns, while the remaining personas are left unchanged as negative examples.
 
-This creates a controlled dataset where the presence or absence of each injected risk factor is known by construction. We can therefore evaluate whether AI-based detection methods can identify these patterns, measure where they succeed or fail, and examine the potential for both under-detection and over-detection.
+- This creates a controlled dataset where the presence or absence of each injected risk factor is known by construction. We can therefore evaluate whether AI-based detection methods can identify these patterns, measure where they succeed or fail, and examine the potential for both under-detection and over-detection.
 
 ## 2. Objectives and rationale
 
