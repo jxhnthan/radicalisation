@@ -17,10 +17,17 @@ COPY data/app_pool.csv ./data/app_pool.csv
 COPY data/analyses.json ./data/analyses.json
 COPY data/evaluation_results.json ./data/evaluation_results.json
 
+# Run as an unprivileged user (SonarQube: containers should not run as root).
+# /app stays writable so /api/sessions can append to data/admin/.
+RUN useradd --create-home --uid 1000 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
 # Ollama is optional at runtime (only used as a fallback for uncached personas);
 # host.docker.internal reaches an Ollama running on the host machine.
+# LLM_API_KEY is a non-secret placeholder for local Ollama (which ignores auth);
+# it is supplied at runtime by docker-compose, not baked into the image.
 ENV LLM_BASE_URL=http://host.docker.internal:11434/v1
-ENV LLM_API_KEY=ollama
 ENV LLM_MODEL=qwen2.5:7b
 
 EXPOSE 8000

@@ -293,7 +293,7 @@ docker compose down -v     # also remove named volumes, if any
 
 - `docker: command not found` - install Docker Desktop (or Docker Engine) and reopen your terminal.
 - `Cannot connect to the Docker daemon` - start Docker Desktop first, then run `docker compose up --build`.
-- Ports 8080 or 8000 already in use - edit the `ports:` mapping in `docker-compose.yml` (e.g. `"9090:80"` for the frontend) and open the app on the new port; the frontend proxies `/api` to the backend container, so only the frontend port needs to change.
+- Ports 8080 or 8000 already in use - edit the `ports:` mapping in `docker-compose.yml` (e.g. `"9090:8080"` for the frontend) and open the app on the new port; the frontend proxies `/api` to the backend container, so only the frontend port needs to change.
 - `ERROR: Cannot locate specified Dockerfile` - you must run `docker compose` from the project root.
 - The precomputed `data/` files are required by the build and are committed to the repo - keep them (do not delete or gitignore them).
 - Ollama is not required for this path; it is only used as a fallback for uncached personas, or by the optional "Full reproduction" below.
