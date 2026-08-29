@@ -6,6 +6,9 @@ Video: https://streamable.com/p0bpy4
 
 Narrative: https://pastebin.com/2ArUmEcc
 
+## Scope and safety boundary:
+This prototype evaluates whether AI can identify predefined textual indicators in synthetic data. It does not identify radicalisation, assess real people, predict harmful behaviour, or support reporting decisions.
+
 ## Contents
 
 - [How it works](#how-it-works)
@@ -29,7 +32,7 @@ Narrative: https://pastebin.com/2ArUmEcc
 
 Here's a walkthrough of the whole data pipeline that this project is using:
 
-1. **Obtaining personas.** The initial dataset (obtained from NVIDIA Nemotron) comprises 148k synthetic Singaporeans, each consisting of demographic variables (age, job, hobbies, cultural background) that mirror the real Singaporean population. For feasability purposes, we randomly sample 1,000 individuals for this project.
+1. **Obtaining personas.** The initial dataset (obtained from NVIDIA Nemotron) comprises 148k synthetic Singaporeans, each consisting of demographic variables (age, job, hobbies, cultural background) that mirror the real Singaporean population. For feasibility purposes, we randomly sample 1,000 individuals for this project.
 
 2. **Make some personas carry risk signals.** We chose not to add new individuals to the existing dataset. Instead, we used a local LLM to rewrite 300 of the 1,000 personas (30%) into three distinct rewrite types, so the resulting labels reflect genuine risk-language detection rather than a classification task to determine if the persona was rewritten. Of the 300 personas, there are 3 main categories:
 
@@ -76,7 +79,7 @@ detection -> precision/recall + hard-negative false-positive rate
 
 This project is designed as a public education tool for the **Singaporean public.**
 
-- End users: Members of the Singapore public. The prototype uses a guess-then-reveal format: users read a synthetic persona and indicate how likely they would be to report the individual to ISD. They then see the AI’s assessment and an explanation of the indicators it identified.
+- End users: Members of the Singapore public. The prototype uses a guess-then-reveal format: users read a synthetic persona and select which textual patterns, if any, they believe are present. They can also select "insufficient information for a person-level judgement." The reveal screen compares their selections with the prototype's indicator-level analysis and explains why text alone cannot support an assessment of a real person.
 
 - The platform assumes no specialised knowledge. It uses plain language, explains indicators in non-technical terms, and explicitly states that the AI’s assessment is not a diagnosis or definitive determination of radicalisation.
 
@@ -151,9 +154,10 @@ The 7B model was chosen over larger/cloud models for speed on the target machine
 - **Licensing:** CC BY 4.0 permits use; NVIDIA is attributed. All derived data
   remains synthetic.
 - **Synthetic-data defense:** real radicalisation data is unavailable and
-  ethically problematic to collect; synthetic personas from a census-aligned,
-  licensed dataset are a safe and high-fidelity substitute for evaluating
-  indicator-detection methods.
+  ethically problematic to collect. Synthetic personas provide a
+  privacy-preserving and controlled proxy for evaluating injected textual
+  patterns. They are not a substitute for real-world prevalence, behavioural
+  context, demographic representativeness, or operational validation.
 
 ## 5. Evaluation methodology
 
@@ -303,9 +307,7 @@ re-seed sample data.
 **Verification status.** The backend image was validated by installing
 `backend/requirements.txt` into a clean environment and booting the same
 endpoints (health / performance / persona / reveal all return 200); the
-frontend build stage was validated with `npm run build`. The full
-`docker compose up --build` has not been run end-to-end on this machine (Docker
-is not installed here), so run the smoke test on first launch.
+frontend build stage was validated with `npm run build`.
 
 ## 7. Results
 
@@ -318,7 +320,7 @@ Metrics are at the flag threshold (signal >= 3).
 - **LLM-as-judge detection** (400-persona precomputed pool): precision 1.00,
   recall 0.31, F1 0.47, ROC-AUC 0.793; over-fired on 0/100 hard negatives.
 - **Rule-vs-LLM agreement** (400): signal Pearson 0.85, flag Cohen's kappa 0.23.
-- **Interpretation:** both detectors are conservative - when they flag, they
+- **Interpretation:** both detectors are conservative: when they flag, they
   are correct, but they miss most positives (low recall). The key result is the
   over-firing check: neither flags ordinary discontent in the hard negatives.
 - **Application:** FastAPI + React guess-then-reveal app working end-to-end,
@@ -372,11 +374,12 @@ Metrics are at the flag threshold (signal >= 3).
   personas, so religiously framed pathways to radicalisation (a common CVE
   theme) are not represented. Results may not generalise to content that draws
   on religious narratives.
-- **Small positive class and single model.** Only 100 personas carry full or
-  partial indicators, and all rewrites come from one local 7B model. The small
-  positive class gives detection metrics wide confidence intervals, and any
-  quirks in the 7B model's writing style may leak into both the data and the
-  LLM-as-judge evaluation.
+- **Small positive class and single generation model.** The dataset contains
+  200 positive personas: 150 full-indicator and 50 partial-indicator examples.
+  The smaller partial-indicator subgroup means recall estimates for subtle
+  cases have substantial uncertainty. All rewritten personas were generated by
+  one local 7B model, so generator-specific linguistic patterns may influence
+  the results.
 - **Indicators are not harmful content.** The injected markers are
   vulnerability signals from CVE research, not hate speech or violent
   advocacy. The detector is not a content-moderation tool, and a detected

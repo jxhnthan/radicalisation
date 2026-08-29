@@ -272,7 +272,7 @@ function PairedChart({ pairs }) {
       viewBox={`0 0 ${W} ${H}`}
       style={{ width: '100%', display: 'block' }}
       role="img"
-      aria-label="Per-session pre and post quiz scores"
+      aria-label="Per-session pre/post quiz scores"
     >
       {[0, 2, 4, 6, 8].map((g) => (
         <g key={g}>
@@ -346,16 +346,27 @@ function PerfSection({ perf }) {
     { name: 'Rule-based', d: perf.rule_based },
     { name: 'LLM-as-judge', d: perf.llm_judge },
   ].filter((m) => m.d)
+  const rocModels = models
+    .filter((m) => m.d?.roc?.fpr?.length > 1)
+    .map((m) => ({ name: m.name, roc: m.d.roc }))
 
   return (
     <div>
       <p style={s.hint}>
         {perf.note || 'Metrics at the flag threshold (signal &ge; 3).'} Both
-        detectors are conservative - when they flag, they are correct, but they
+        detectors are conservative: when they flag, they are correct, but they
         miss most positives.
       </p>
 
       <div style={s.charts}>
+        {rocModels.length > 0 && (
+          <div style={{ ...s.chartCard, flex: '1 1 100%' }}>
+            <div style={s.chartTitle}>
+              ROC curves <span style={s.mSub}>· signal as the score · hover to inspect</span>
+            </div>
+            <RocChart curves={rocModels} />
+          </div>
+        )}
         {models.map((m) => (
           <div style={s.chartCard} key={m.name}>
             <div style={s.chartTitle}>
@@ -397,6 +408,171 @@ function PerfSection({ perf }) {
           </span>
         </div>
       </div>
+    </div>
+  )
+}
+
+function RocChart({ curves }) {
+  const W = 640
+  const H = 380
+  const padL = 44
+  const padR = 170
+  const padT = 16
+  const padB = 38
+  const plotW = W - padL - padR
+  const plotH = H - padT - padB
+  const x = (v) => padL + plotW * v
+  const y = (v) => padT + plotH * (1 - v)
+  const [hover, setHover] = useState(null)
+
+  if (!curves.length || !curves[0]?.roc?.fpr) return null
+  const colors = ['var(--accent)', 'var(--red)']
+  const grid = [0, 0.25, 0.5, 0.75, 1]
+  const n = curves[0].roc.fpr.length - 1
+  const plotted = curves.map((c, i) => ({
+    name: c.name,
+    auc: c.roc.auc,
+    color: colors[i % colors.length],
+    d: c.roc.fpr
+      .map((f, j) => `${j ? 'L' : 'M'}${x(f).toFixed(1)} ${y(c.roc.tpr[j]).toFixed(1)}`)
+      .join(' '),
+  }))
+
+  function moveTo(fx) {
+    const f = Math.min(1, Math.max(0, fx))
+    const idx = Math.round(f * n)
+    setHover({
+      fpr: curves[0].roc.fpr[idx],
+      rows: curves.map((c, i) => ({
+        name: c.name,
+        tpr: c.roc.tpr[idx],
+        color: colors[i % colors.length],
+      })),
+    })
+  }
+
+  function onMove(e) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const scale = rect.width / W
+    const fx = ((e.clientX - rect.left) / scale - padL) / plotW
+    if (fx < 0 || fx > 1) {
+      setHover(null)
+      return
+    }
+    moveTo(fx)
+  }
+
+  function onKey(e) {
+    const base = hover ? hover.fpr : 0.5
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      moveTo(base + 0.05)
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      moveTo(base - 0.05)
+    }
+  }
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width: '100%', display: 'block', touchAction: 'none' }}
+        tabIndex={0}
+        onKeyDown={onKey}
+        role="img"
+        aria-label="ROC curves for the rule-based and LLM-judge detectors. Use arrow keys to move the crosshair."
+      >
+        {grid.map((g) => (
+          <g key={g}>
+            <line x1={x(0)} x2={x(1)} y1={y(g)} y2={y(g)} stroke="var(--hover)" strokeWidth="1" />
+            <line x1={x(g)} x2={x(g)} y1={y(0)} y2={y(1)} stroke="var(--hover)" strokeWidth="1" />
+            <text x={x(g)} y={H - padB + 15} fontSize="10" fill="var(--text-faint)" textAnchor="middle">
+              {Math.round(g * 100)}
+            </text>
+            <text x={padL - 7} y={y(g) + 3} fontSize="10" fill="var(--text-faint)" textAnchor="end">
+              {Math.round(g * 100)}
+            </text>
+          </g>
+        ))}
+        <text x={x(0.5)} y={H - 4} fontSize="10" fill="var(--text-faint)" textAnchor="middle">
+          False positive rate (%)
+        </text>
+        <text
+          x={12}
+          y={y(0.5)}
+          fontSize="10"
+          fill="var(--text-faint)"
+          textAnchor="middle"
+          transform={`rotate(-90 12 ${y(0.5)})`}
+        >
+          True positive rate (%)
+        </text>
+
+        <line
+          x1={x(0)}
+          x2={x(1)}
+          y1={y(0)}
+          y2={y(1)}
+          stroke="var(--text-faint)"
+          strokeWidth="1"
+          strokeDasharray="3 4"
+        />
+
+        {plotted.map((c) => (
+          <path
+            key={c.name}
+            d={c.d}
+            fill="none"
+            stroke={c.color}
+            strokeWidth="2"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ))}
+
+        {hover && (
+          <line
+            x1={x(hover.fpr)}
+            x2={x(hover.fpr)}
+            y1={y(0)}
+            y2={y(1)}
+            stroke="var(--text-muted)"
+            strokeWidth="1"
+            strokeDasharray="2 3"
+          />
+        )}
+
+        {plotted.map((c, i) => (
+          <text key={c.name} x={x(1) + 8} y={26 + i * 22} fontSize="11" fontWeight={600} fill={c.color}>
+            {c.name} · AUC {c.auc}
+          </text>
+        ))}
+
+        <rect
+          x={x(0)}
+          y={y(1)}
+          width={plotW}
+          height={plotH}
+          fill="transparent"
+          onMouseMove={onMove}
+          onMouseLeave={() => setHover(null)}
+          onTouchMove={onMove}
+          onTouchEnd={() => setHover(null)}
+        />
+      </svg>
+
+      {hover && (
+        <output style={s.rocTip}>
+          <span style={s.rocTipLbl}>FPR {Math.round(hover.fpr * 100)}%</span>
+          {hover.rows.map((r) => (
+            <span key={r.name} style={s.rocTipRow}>
+              <span style={{ color: r.color }}>{r.name}</span>
+              <span>TPR {Math.round(r.tpr * 100)}%</span>
+            </span>
+          ))}
+        </output>
+      )}
     </div>
   )
 }
@@ -602,6 +778,16 @@ const s = {
   },
   mVal: { fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap' },
   mSub: { fontSize: 12, fontWeight: 400, color: 'var(--text-faint)' },
+  rocTip: {
+    marginTop: 8,
+    fontSize: 12,
+    color: 'var(--text-muted)',
+    display: 'flex',
+    gap: 14,
+    flexWrap: 'wrap',
+  },
+  rocTipLbl: { fontWeight: 600 },
+  rocTipRow: { display: 'inline-flex', gap: 6, alignItems: 'center' },
   cmTitle: {
     fontSize: 11,
     fontWeight: 600,

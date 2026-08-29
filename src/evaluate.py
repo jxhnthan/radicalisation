@@ -13,6 +13,7 @@ from sklearn.metrics import (
     cohen_kappa_score,
     precision_recall_fscore_support,
     roc_auc_score,
+    roc_curve,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -40,6 +41,27 @@ def _metrics(y, flag, signal) -> dict:
         "recall": round(float(rec), 3),
         "f1": round(float(f1), 3),
         "roc_auc": round(float(auc), 3) if not np.isnan(auc) else None,
+        "roc": _roc_curve(y, signal) if len(set(y)) > 1 else None,
+    }
+
+
+def _roc_curve(y, signal, n=101) -> dict | None:
+    # ROC curve interpolated onto a fixed FPR grid so the admin dashboard can
+    # render a smooth, lightweight, interactive curve. None when only one
+    # class is present (AUC is undefined).
+    y = np.asarray(y, dtype=int)
+    signal = np.asarray(signal, dtype=float)
+    if len(set(y)) < 2:
+        return None
+    fpr, tpr, _ = roc_curve(y, signal)
+    grid = np.linspace(0.0, 1.0, n)
+    tpr_grid = np.interp(grid, fpr, tpr)
+    tpr_grid[0] = 0.0
+    tpr_grid[-1] = 1.0
+    return {
+        "fpr": [round(float(v), 4) for v in grid],
+        "tpr": [round(float(v), 4) for v in tpr_grid],
+        "auc": round(float(roc_auc_score(y, signal)), 3),
     }
 
 

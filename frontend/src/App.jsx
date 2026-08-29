@@ -287,7 +287,10 @@ function Masthead({ isAdmin, onToggleAdmin, toolsOpen, setToolsOpen }) {
       </div>
       <h1 style={s.h1}>Spotting the signs of radicalisation</h1>
       <p className="sub-line" style={s.sub}>
-        Read a synthetic persona. Decide how likely you would be to report it. Then see what the AI detects and why.
+        Users read a synthetic persona and select which textual patterns, if any, they believe are present. They can also select "insufficient information for a person-level judgement."
+      </p>
+      <p className="sub-line" style={s.subNote}>
+        The reveal screen compares their selections with the prototype's indicator-level analysis and explains why text alone cannot support an assessment of a real person.
       </p>
       <div style={s.caveatBox}>
         <span style={s.caveatIcon} aria-hidden="true">
@@ -1053,6 +1056,12 @@ const s = {
   h1: { fontSize: 28, marginBottom: 4 },
   sub: {
     color: 'var(--text-muted)',
+    marginBottom: 0,
+    fontSize: 14,
+  },
+  subNote: {
+    color: 'var(--text-muted)',
+    marginTop: 6,
     marginBottom: 0,
     fontSize: 14,
   },

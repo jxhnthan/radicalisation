@@ -24,14 +24,9 @@
   outline-offset: 2px;
 }
 
-/* One-line tagline on desktop; wrap on narrow screens so it never overflows */
+/* Masthead description; wraps on all screen sizes so it never overflows */
 .sub-line {
-  white-space: nowrap;
-}
-@media (max-width: 560px) {
-  .sub-line {
-    white-space: normal;
-  }
+  white-space: normal;
 }
 
 /* Native <dialog> used by the learning check */
