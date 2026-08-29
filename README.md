@@ -241,9 +241,9 @@ cp .env.example .env
 `data/analyses.json` (app pool + judge analyses). Then run the app as in
 Quickstart.
 
-### Run with Docker (recommended for the assessor)
+### Run with Docker 
 
-The fastest way to run the full app on a fresh machine - no Python, Node or
+The fastest way to run the full app on a fresh machine without Python, Node or
 Ollama installs required. The precomputed data (app pool + judge analyses) is
 baked into the backend image, so the demo runs fully offline; Ollama is only a
 fallback for uncached personas and is NOT needed for the demo.
