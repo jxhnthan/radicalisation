@@ -170,7 +170,7 @@ Reliable radicalisation-labelled data is hard to obtain ethically, and there is 
 The rule-based detector gives a transparent, inspectable baseline. The LLM-as-judge tests whether semantic reasoning catches indicators simple rules miss. Since the same LLM family generates the synthetic examples, LLM-judge results are treated as a comparison point rather than ground truth; agreement with the independent rule-based detector guards against relying solely on the generating model.
 
 **Evaluation design**
-Three questions drive the design: (1) can the detector catch injected indicators, (2) does it hold up when indicators are subtle or partial, and (3) does it avoid over-flagging personas that merely sound discontented?
+There are three main questions we hope to address: (1) can the detector catch injected indicators, (2) does it hold up when indicators are subtle or partial, and (3) does it avoid over-flagging personas that merely sound discontented?
 
 - **Primary:** binary detection against ground truth — 200 positives (full + partial indicators) vs. 800 negatives (baseline + hard negatives). We report precision, recall, and the confusion matrix at a pre-specified threshold, not a single aggregate score.
 - **Cohort-level:** recall is reported separately for full and partial-indicator personas, since overall performance can mask weak detection of subtler signals.
@@ -248,7 +248,7 @@ Ollama installs required. The precomputed data (app pool + judge analyses) is
 baked into the backend image, so the demo runs fully offline; Ollama is only a
 fallback for uncached personas and is NOT needed for the demo.
 
-**Prerequisites.** Docker Desktop (macOS/Windows) or Docker Engine + Compose v2
+**Prerequisites** Docker Desktop (macOS/Windows) or Docker Engine + Compose v2
 (Linux). Confirm with:
 
 ```bash
@@ -256,7 +256,7 @@ docker --version
 docker compose version
 ```
 
-**Run it.**
+**How to run**
 
 ```bash
 # From the project root (the folder containing docker-compose.yml):
@@ -277,19 +277,19 @@ curl http://localhost:8000/api/performance                         # measured me
 curl "http://localhost:8000/api/persona?session=demo"              # a JSON persona
 ```
 
-**Manual check.** At http://localhost:8080 you should see the landing page, then
+**Running manual checks** At http://localhost:8080 you should see the landing page, then
 be able to load a persona and get an instant "reveal" (offline, no LLM needed).
 The admin dashboard is at http://localhost:8080/#/admin - use its "Simulate"
 button to seed sample data and see a populated report.
 
-**Stop / clean up.**
+**How to stop / clean up**
 
 ```bash
 docker compose down        # stop the containers
 docker compose down -v     # also remove named volumes, if any
 ```
 
-**Troubleshooting.**
+**How to troubleshoot**
 
 - `docker: command not found` - install Docker Desktop (or Docker Engine) and reopen your terminal.
 - `Cannot connect to the Docker daemon` - start Docker Desktop first, then run `docker compose up --build`.
